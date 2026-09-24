@@ -1,30 +1,22 @@
 # FLOP Tools ecosystem map
 
-The public surface is intentionally organized by role instead of repository count.
+The public surface is organized by user job, not repository count.
 
-## Core
+## Core path
 
-- **ROUTE — flop-session-router:** routing and RuntimeTarget selection.
-- **PROVE — flop-conformance-lab:** independent verification and portable conformance evidence.
-- **OBSERVE — flop-control-center:** operational and longitudinal observation.
+- **RUN — @flop-tools/agent:** advertise, discover, delegate/receive work, execute through a runtime and persist evidence automatically.
+- **ROUTE — flop-session-router:** deterministic selection, preflight, failover, circuit breaking and routing evidence.
+- **PROVE — flop-conformance-lab:** independent verification, cross-system conformance, replay and protocol evolution evidence.
+- **OBSERVE — flop-control-center:** runtime health, longitudinal observation and operational visibility.
 
-## Components
+## Supporting components
 
-- **flop-work-execution-receipt:** neutral execution/evidence envelope between runtime and verification.
-- **EvidenceBundle:** portable evidence produced or consumed by conformance flows.
-- **Protocol Drift Observatory:** detects when pinned upstream sources change and invalidates stale assumptions.
-- **Runtime Observatory:** executes bounded probes and records reproducible runtime evidence.
+- **flop-work-execution-receipt:** neutral portable execution receipt.
+- **EvidenceBundle:** portable verification evidence.
+- **RuntimeTarget:** adapter boundary between routing and execution.
+- **Protocol Drift / Runtime / Interaction / Longitudinal Observatories:** history, replay and before/after evidence.
+- **flop-empires:** reference end-to-end consumer; never counted as external adoption.
 
-## Reference and research
+## Product principle
 
-- **flop-empires:** reference application for the complete Route -> Prove -> Observe journey.
-- **flop-protocol-reproducibility-audits:** focused reproducibility research and upstream evidence.
-- **inference-market:** independent consumer/experiment for inference pricing and runtime integration.
-
-## Technocore ecosystem
-
-- **technocore-did-tool / technocore-did-starter:** identity and onboarding utilities.
-- **awesome-technocore:** ecosystem index.
-- Technocore observations are evidence inputs, not a separate FLOP Tools core surface.
-
-Forks and one-off reproductions remain supporting evidence rather than top-level products.
+A builder should be able to get value from RUN without understanding the verification stack. ROUTE, PROVE and OBSERVE become progressively available without changing the core work API.

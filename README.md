@@ -1,27 +1,51 @@
 # FLOP Tools
 
-Independent community tooling for routing agent work, proving what executed, and observing whether implementations remain conformant.
+Independent community tooling for making agent work run reliably, then proving and observing what happened.
 
 > Alpha community project. Not an official FLOP Labs product.
 
-## Route -> Prove -> Observe
+## Run -> Route -> Prove -> Observe
 
-| Surface | Repository | Purpose |
+| Surface | Repository / package | Purpose |
 |---|---|---|
-| **ROUTE** | [flop-session-router](https://github.com/retardio73-boop/flop-session-router) | Deterministic candidate selection, preflight, failover and auditable routing. |
-| **PROVE** | [flop-conformance-lab](https://github.com/retardio73-boop/flop-conformance-lab) | Portable conformance evidence across FLOP, TCLK, Technocore and runtime boundaries. |
-| **OBSERVE** | [flop-control-center](https://github.com/retardio73-boop/flop-control-center) | Runtime health, continuity, protocol drift and operational visibility. |
+| **RUN** | `@flop-tools/agent` | One entry point to advertise capabilities, receive/delegate work, execute reliably and emit evidence automatically. |
+| **ROUTE** | `flop-session-router` | Deterministic candidate selection, preflight, failover and auditable routing. |
+| **PROVE** | `flop-conformance-lab` | Portable conformance evidence across FLOP, TCLK, Technocore and runtime boundaries. |
+| **OBSERVE** | `flop-control-center` | Runtime health, continuity, protocol drift and longitudinal visibility. |
 
-The common journey is:
+The intended builder journey is:
 
 ```text
-discover -> route -> execute -> Execution Receipt -> EvidenceBundle -> verify -> observe -> replay
+install -> advertise -> discover -> route -> execute -> result
+                                      |
+                                      v
+                             Execution Receipt
+                                      |
+                                      v
+                               EvidenceBundle
+                                      |
+                                      v
+                              verify -> observe
 ```
 
-Start with one surface. You do not need to adopt the whole stack.
+The builder should not need to understand Receipt, EvidenceBundle or Conformance Lab to obtain Tier 1 value.
 
-## Reference journey
+## Quick start
 
-[FLOP Empires](https://github.com/retardio73-boop/flop-empires) is the reference application used to demonstrate composition across the stack. It is not counted as external adoption.
+```bash
+npm install
+npm run build
+node dist/src/cli.js init --id my-agent --capabilities research,code
+node dist/src/cli.js publish
+node dist/src/cli.js run --capability research --input "{\"task\":\"summarize\"}"
+```
 
-See [ECOSYSTEM.md](ECOSYSTEM.md) for component roles and [ADOPTION.md](ADOPTION.md) for the narrowest integration paths.
+To receive work:
+
+```bash
+node dist/src/cli.js serve --port 8787
+```
+
+Every completed request persists a receipt, evidence bundle, latest snapshot and append-only observation record under the configured state directory.
+
+See `docs/ARCHITECTURE.md` and `ADOPTION.md`.

@@ -1,25 +1,34 @@
 # Adoption paths
 
-Adoption should be incremental and evidence-producing.
+The adoption strategy is incremental. Do not ask external builders to adopt the whole stack.
 
-## 1. Use one fixture
+## Smallest useful adoption
 
-Run a single Conformance Lab profile against your own evidence and retain `conformance-report.json`.
+1. Install or vendor FLOP Agent.
+2. Publish one capability.
+3. Receive or delegate one bounded work request.
+4. Keep the generated receipt and evidence bundle.
 
-## 2. Use one action
+That single Tier 1 integration can later become:
+- Session Router consumer;
+- RuntimeTarget adapter;
+- Work Execution Receipt producer;
+- EvidenceBundle producer;
+- Conformance Lab CI consumer;
+- longitudinal observation source.
 
-Pin the Conformance Lab GitHub Action to an immutable commit and keep the result in CI.
+## External integration sequence
 
-## 3. Consume one receipt
+```text
+make one task run
+-> keep one receipt
+-> verify one evidence bundle
+-> pin one conformance profile in CI
+-> retain before/after history
+```
 
-Emit or consume a Portable Work / Execution Receipt without adopting Router or Control Center.
+External adoption means an independent project consumes one of these surfaces. FLOP Empires remains a reference application only.
 
-## 4. Implement one RuntimeTarget
+## Outreach rule
 
-Expose a narrow runtime adapter that Session Router can preflight and invoke.
-
-## 5. Keep one observable result
-
-Publish bounded runtime or conformance evidence so Control Center / observatory tooling can track change over time.
-
-External adoption means another independently maintained project consumes a FLOP Tools surface and retains reproducible evidence. Self-tests, forks and stars are tracked separately.
+Lead with the external builder's immediate problem. Offer a minimal executable integration, a fixture, an adapter or a reproducible before/after result. Do not lead with a request to adopt the entire FLOP Tools stack.

@@ -1,8 +1,9 @@
 {
-  "schema": "flop-tools-ecosystem/v1",
+  "schema": "flop-tools-ecosystem/v2",
   "name": "FLOP Tools",
-  "tagline": "Route -> Prove -> Observe",
+  "tagline": "Run -> Route -> Prove -> Observe",
   "core": {
+    "run": "@flop-tools/agent",
     "route": "https://github.com/retardio73-boop/flop-session-router",
     "prove": "https://github.com/retardio73-boop/flop-conformance-lab",
     "observe": "https://github.com/retardio73-boop/flop-control-center"

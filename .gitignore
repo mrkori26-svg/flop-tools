@@ -1,0 +1,5 @@
+node_modules/
+dist/
+.flop/
+flop-agent.json
+*.log
