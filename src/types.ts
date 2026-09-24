@@ -1,4 +1,5 @@
 import type { WorkExecutionReceipt as PortableWorkExecutionReceipt } from "@flop-tools/work-execution-receipt";
+import type { PortableConformanceResult } from "@flop-tools/conformance-lab";
 
 export type RuntimeKind = "shell" | "http";
 
@@ -88,5 +89,6 @@ export interface EvidenceBundle {
     status: "PASS" | "FAIL";
     checks: Record<string, boolean>;
   };
+  independentVerification?: PortableConformanceResult;
   createdAt: string;
 }

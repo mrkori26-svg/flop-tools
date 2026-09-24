@@ -34,11 +34,13 @@ No payment, economic finality, external independence or cross-implementation con
 
 Runtime configuration controls timeout and retry budget. HTTP execution carries an idempotency key. State artifacts are append-only at the observation index and immutable by identifier for receipts and bundles.
 
-## Integration direction
+## Integrated composition
 
-RUN should progressively delegate specialized responsibilities to the existing FLOP Tools components:
+RUN now delegates specialized responsibilities instead of duplicating them:
 
-- Session Router for richer candidate scoring, preflight, circuit breaking and failover.
-- Work Execution Receipt for the neutral portable receipt schema.
-- Conformance Lab for independent verification and cross-system profiles.
-- Control Center / longitudinal observatory for aggregated operational history.
+- Session Router owns the persisted routing decision and config/snapshot hashes.
+- Work Execution Receipt supplies the neutral portable receipt alongside the RUN receipt.
+- Conformance Lab independently verifies every locally executed bundle with the `flop-agent` profile.
+- Control Center consumes append-only `ObservationRecord v1` events through its agent-work observatory.
+
+The local self-check is explicitly separate from independent Lab verification. Neither layer infers payment settlement, economic finality, external independence or complete coverage without evidence for those claims.

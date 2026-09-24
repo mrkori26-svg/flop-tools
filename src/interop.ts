@@ -29,14 +29,18 @@ export async function publishArtifacts(stateDir: string, receipt: WorkReceipt, b
     schema: "flop.observation-record/v1",
     source: "flop-agent",
     subject: receipt.workId,
-    status: bundle.verification.status,
+    status: bundle.independentVerification?.result === "FAIL"
+      ? "FAIL"
+      : bundle.independentVerification?.result === "PASS"
+        ? "PASS"
+        : bundle.verification.status,
     observedAt: bundle.createdAt,
     evidenceRef: bundlePath,
     dimensions: {
       route: !!receipt.route.selectedAgentId,
       execution: receipt.result.status === "completed",
       receipt: !!receipt.receiptId,
-      verification: bundle.verification.status === "PASS",
+      verification: bundle.independentVerification?.result === "PASS",
     },
   };
   await appendFile(observationPath, JSON.stringify(observation) + "\n", "utf8");

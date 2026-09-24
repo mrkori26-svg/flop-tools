@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
+import { verifyExternalProfile } from "@flop-tools/conformance-lab";
 import { advertise, buildEvidence, buildReceipt, digest, discover, saveJson } from "./core.js";
 import { publishArtifacts } from "./interop.js";
 import { routeWithSessionRouter } from "./router-adapter.js";
