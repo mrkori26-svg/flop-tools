@@ -3,7 +3,8 @@ import { createServer } from "node:http";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { FlopAgent } from "./agent.js";
-import { loadConfig, newWorkId } from "./core.js";
+import { technocoreSignerStatus } from "./technocore.js";
+import { loadConfig, newWorkId, validateWorkRequest } from "./core.js";
 import type { AgentConfig, WorkRequest } from "./types.js";
 
 const args = process.argv.slice(2);
@@ -16,6 +17,10 @@ const configPath = resolve(value("--config", "flop-agent.json")!);
 
 async function init() {
   const cwd = process.cwd();
+  const discoveryKind = value("--discovery", "local") as "local" | "technocore";
+  if (!["local","technocore"].includes(discoveryKind)) throw new Error("INVALID_DISCOVERY_KIND");
+  const signerCommand = value("--signer-command");
+  const signerArgs = value("--signer-args");
   const config: AgentConfig = {
     id: value("--id", "local-agent")!,
     name: value("--name", "Local FLOP Agent")!,
@@ -23,6 +28,13 @@ async function init() {
     registryPath: resolve(value("--registry", ".flop/registry.json")!),
     stateDir: resolve(value("--state", ".flop/state")!),
     advertiseEndpoint: value("--endpoint", "http://127.0.0.1:8787/work"),
+    auth: value("--token-env") ? { tokenEnv: value("--token-env") } : undefined,
+    discovery: discoveryKind === "technocore" ? {
+      kind: "technocore",
+      room: value("--room", "d-flop-infra"),
+      baseUrl: value("--technocore-url", "https://technocore.chat"),
+      signer: signerCommand ? { command: signerCommand, args: signerArgs ? JSON.parse(signerArgs) : [] } : undefined,
+    } : { kind: "local" },
     runtime: {
       kind: "shell",
       command: process.execPath,
@@ -61,28 +73,59 @@ async function run() {
 
 async function serve() {
   const config = await loadConfig(configPath);
+  const port = Number(value("--port", "8787"));
+  if (!Number.isSafeInteger(port) || port < 1 || port > 65535) throw new Error("INVALID_PORT");
+  const host = value("--host", "127.0.0.1")!;
+  if (value("--endpoint")) config.advertiseEndpoint = value("--endpoint");
+  else if (!config.advertiseEndpoint || config.advertiseEndpoint === "http://127.0.0.1:8787/work") {
+    config.advertiseEndpoint = `http://127.0.0.1:${port}/work`;
+  }
   const agent = new FlopAgent(config);
   await agent.publish();
-  const port = Number(value("--port", "8787"));
   const server = createServer(async (req,res) => {
     if (req.method === "GET" && req.url === "/health") {
       res.writeHead(200, {"content-type":"application/json"});
       return res.end(JSON.stringify({ok:true,agentId:config.id,capabilities:config.capabilities}));
     }
     if (req.method !== "POST" || req.url !== "/work") { res.writeHead(404); return res.end(); }
+    if (!(req.headers["content-type"] ?? "").toLowerCase().startsWith("application/json")) {
+      res.writeHead(415, {"content-type":"application/json"});
+      return res.end(JSON.stringify({error:"CONTENT_TYPE_REQUIRED"}));
+    }
+    const tokenEnv = config.auth?.tokenEnv;
+    if (tokenEnv) {
+      const expected = process.env[tokenEnv];
+      if (!expected) {
+        res.writeHead(503, {"content-type":"application/json"});
+        return res.end(JSON.stringify({error:"AUTH_TOKEN_UNAVAILABLE"}));
+      }
+      if (req.headers.authorization !== `Bearer ${expected}`) {
+        res.writeHead(401, {"content-type":"application/json"});
+        return res.end(JSON.stringify({error:"UNAUTHORIZED"}));
+      }
+    }
     const chunks: Buffer[] = [];
-    for await (const chunk of req) chunks.push(Buffer.from(chunk));
+    let bytes = 0;
     try {
-      const request = JSON.parse(Buffer.concat(chunks).toString("utf8")) as WorkRequest;
+      for await (const chunk of req) {
+        const part = Buffer.from(chunk);
+        bytes += part.length;
+        if (bytes > 1024 * 1024) throw new Error("REQUEST_TOO_LARGE");
+        chunks.push(part);
+      }
+      const request = validateWorkRequest(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+      if (!config.capabilities.includes(request.capability)) throw new Error("CAPABILITY_NOT_ADVERTISED");
       const bundle = await agent.executeIncoming(request);
-      res.writeHead(bundle.verification.status === "PASS" ? 200 : 500, {"content-type":"application/json"});
+      const verified = bundle.independentVerification?.result === "PASS";
+      res.writeHead(verified ? 200 : 500, {"content-type":"application/json"});
       res.end(JSON.stringify(bundle));
     } catch (error) {
-      res.writeHead(400, {"content-type":"application/json"});
-      res.end(JSON.stringify({error:error instanceof Error?error.message:String(error)}));
+      const message = error instanceof Error ? error.message : String(error);
+      res.writeHead(message === "REQUEST_TOO_LARGE" ? 413 : 400, {"content-type":"application/json"});
+      res.end(JSON.stringify({error:message}));
     }
   });
-  server.listen(port, "127.0.0.1", () => console.log(`flop-agent ${config.id} listening on http://127.0.0.1:${port}`));
+  server.listen(port, host, () => console.log(`flop-agent ${config.id} listening on http://${host}:${port}`));
 }
 
 async function demo() {
@@ -91,12 +134,44 @@ async function demo() {
   await run();
 }
 
+async function doctor() {
+  const config = await loadConfig(configPath);
+  const agent = new FlopAgent(config);
+  const checks: Record<string, unknown> = {
+    config: "PASS",
+    agentId: config.id,
+    capabilities: config.capabilities,
+    discovery: config.discovery?.kind ?? "local",
+  };
+  if (!config.capabilities.length) checks.config = "FAIL:NO_CAPABILITIES";
+  if (config.discovery?.kind === "technocore") {
+    const signer = await technocoreSignerStatus(config);
+    checks.signer = signer;
+    try {
+      const candidates = await agent.candidates();
+      checks.discoveryRead = {ok:true,candidates:candidates.length};
+    } catch (error) {
+      checks.discoveryRead = {ok:false,error:error instanceof Error?error.message:String(error)};
+    }
+  } else {
+    checks.discoveryRead = {ok:true,candidates:(await agent.candidates()).length};
+  }
+  const failed = Object.values(checks).some(value =>
+    typeof value === "string" ? value.startsWith("FAIL") :
+    value && typeof value === "object" && "ok" in value && (value as {ok?:boolean}).ok === false
+  );
+  console.log(JSON.stringify({schema:"flop-agent-doctor/v1",status:failed?"FAIL":"PASS",checks}, null, 2));
+  if (failed) process.exitCode = 1;
+}
+
 async function main() {
   if (cmd === "init") return init();
   if (cmd === "publish") return publish();
   if (cmd === "run") return run();
   if (cmd === "serve") return serve();
   if (cmd === "demo") return demo();
-  console.log("flop-agent <init|publish|run|serve|demo> [--config flop-agent.json]");
+  if (cmd === "doctor") return doctor();
+  console.log("flop-agent <init|publish|run|serve|demo|doctor> [--config flop-agent.json]");
+  console.log("init options: --discovery local|technocore --room <room> --signer-command <path> --signer-args '[\"script.py\"]'");
 }
 main().catch(error => { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; });

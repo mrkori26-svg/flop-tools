@@ -5,6 +5,7 @@ import { advertise, buildEvidence, buildReceipt, digest, discover, saveJson } fr
 import { publishArtifacts } from "./interop.js";
 import { executeRoutedWork, routeWithSessionRouter } from "./router-adapter.js";
 import { executeWork } from "./runtime.js";
+import { discoverTechnocore, publishTechnocore } from "./technocore.js";
 import type { AgentAdvertisement, AgentConfig, EvidenceBundle, WorkRequest } from "./types.js";
 
 async function upsertAdvertisement(path: string, item: AgentAdvertisement): Promise<void> {
@@ -20,13 +21,22 @@ export class FlopAgent {
 
   async publish(): Promise<AgentAdvertisement> {
     const item = advertise(this.config);
-    await upsertAdvertisement(this.config.registryPath, item);
-    await saveJson(join(this.config.stateDir, "advertisement.json"), item);
-    return item;
+    const published = this.config.discovery?.kind === "technocore"
+      ? await publishTechnocore(this.config, item)
+      : item;
+    if (this.config.discovery?.kind !== "technocore") await upsertAdvertisement(this.config.registryPath, published);
+    await saveJson(join(this.config.stateDir, "advertisement.json"), published);
+    return published;
+  }
+
+  async candidates() {
+    return this.config.discovery?.kind === "technocore"
+      ? discoverTechnocore(this.config)
+      : discover(this.config.registryPath);
   }
 
   async run(request: WorkRequest): Promise<EvidenceBundle> {
-    const candidates = await discover(this.config.registryPath);
+    const candidates = await this.candidates();
     const routed = await executeRoutedWork(
       request,
       candidates,

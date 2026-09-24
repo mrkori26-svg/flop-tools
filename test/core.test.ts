@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildEvidence, buildReceipt, digest, route } from "../src/core.js";
+import { buildEvidence, buildReceipt, digest, route, validateWorkRequest } from "../src/core.js";
 
 test("digest is deterministic across object key order", () => {
   assert.equal(digest({a:1,b:2}), digest({b:2,a:1}));
@@ -33,4 +33,10 @@ test("receipt automatically becomes verified evidence", () => {
   const evidence = buildEvidence(receipt);
   assert.equal(evidence.verification.status, "PASS");
   assert.match(receipt.outputDigest!, /^sha256:/);
+});
+
+test("work request validation rejects malformed capabilities and budgets", () => {
+  assert.throws(() => validateWorkRequest({id:"x",capability:"bad capability",input:{}}), /INVALID_WORK_CAPABILITY/);
+  assert.throws(() => validateWorkRequest({id:"x",capability:"research",input:{},budget:{amount:"1.2",asset:"USDC"}}), /INVALID_WORK_BUDGET/);
+  assert.equal(validateWorkRequest({id:"x",capability:"research",input:{}}).capability, "research");
 });

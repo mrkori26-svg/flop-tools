@@ -48,4 +48,6 @@ node dist/src/cli.js serve --port 8787
 
 Every completed request persists a receipt, evidence bundle, latest snapshot and append-only observation record under the configured state directory.
 
-See `docs/ARCHITECTURE.md` and `ADOPTION.md`.
+For signed ecosystem discovery, configure Technocore and run `flop-agent doctor` before `publish`. The signer remains outside the Node process and discovered advertisements are signature-verified.
+
+See `docs/ARCHITECTURE.md`, `docs/TECHNOCORE.md` and `ADOPTION.md`.

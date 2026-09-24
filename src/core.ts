@@ -111,3 +111,25 @@ export function buildEvidence(receipt: WorkReceipt): EvidenceBundle {
 }
 
 export const newWorkId = (): string => "work_" + randomUUID();
+
+export function validateWorkRequest(value: unknown): WorkRequest {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("INVALID_WORK_REQUEST");
+  const item = value as Record<string, unknown>;
+  if (typeof item.id !== "string" || item.id.length < 1 || item.id.length > 200) throw new Error("INVALID_WORK_ID");
+  if (typeof item.capability !== "string" || !/^[a-zA-Z0-9._:-]{1,128}$/.test(item.capability)) {
+    throw new Error("INVALID_WORK_CAPABILITY");
+  }
+  if (item.idempotencyKey !== undefined &&
+      (typeof item.idempotencyKey !== "string" || item.idempotencyKey.length < 1 || item.idempotencyKey.length > 256)) {
+    throw new Error("INVALID_IDEMPOTENCY_KEY");
+  }
+  if (item.budget !== undefined) {
+    if (!item.budget || typeof item.budget !== "object" || Array.isArray(item.budget)) throw new Error("INVALID_WORK_BUDGET");
+    const budget = item.budget as Record<string, unknown>;
+    if (typeof budget.amount !== "string" || !/^\d+$/.test(budget.amount) ||
+        typeof budget.asset !== "string" || budget.asset.length < 1 || budget.asset.length > 64) {
+      throw new Error("INVALID_WORK_BUDGET");
+    }
+  }
+  return value as WorkRequest;
+}

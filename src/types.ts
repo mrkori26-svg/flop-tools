@@ -10,6 +10,13 @@ export interface AgentConfig {
   registryPath: string;
   stateDir: string;
   advertiseEndpoint?: string;
+  auth?: { tokenEnv?: string };
+  discovery?: {
+    kind: "local" | "technocore";
+    room?: string;
+    baseUrl?: string;
+    signer?: { command: string; args?: string[] };
+  };
   runtime: {
     kind: RuntimeKind;
     command?: string;
