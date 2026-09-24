@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { verifyExternalProfile } from "@flop-tools/conformance-lab";
 import { advertise, buildEvidence, buildReceipt, digest, discover, saveJson } from "./core.js";
 import { publishArtifacts } from "./interop.js";
-import { routeWithSessionRouter } from "./router-adapter.js";
+import { executeRoutedWork, routeWithSessionRouter } from "./router-adapter.js";
 import { executeWork } from "./runtime.js";
 import type { AgentAdvertisement, AgentConfig, EvidenceBundle, WorkRequest } from "./types.js";
 
@@ -27,28 +27,38 @@ export class FlopAgent {
 
   async run(request: WorkRequest): Promise<EvidenceBundle> {
     const candidates = await discover(this.config.registryPath);
-    const { decision } = await routeWithSessionRouter(request, candidates, this.config.stateDir);
-    if (decision.selectedAgentId !== this.config.id) {
-      const selected = candidates.find(x => x.agentId === decision.selectedAgentId);
-      if (!selected?.endpoint) throw new Error(`REMOTE_ENDPOINT_MISSING:${decision.selectedAgentId}`);
-      const ctl = new AbortController();
-      const timer = setTimeout(() => ctl.abort(), this.config.runtime.timeoutMs);
-      try {
-        const response = await fetch(selected.endpoint, {
+    const routed = await executeRoutedWork(
+      request,
+      candidates,
+      this.config.stateDir,
+      this.config.runtime.maxAttempts,
+      this.config.runtime.timeoutMs,
+      async (candidate, signal) => {
+        if (candidate.agentId === this.config.id) {
+          return { kind: "local" as const, result: await executeWork(this.config, request) };
+        }
+        if (!candidate.endpoint) throw new Error(`REMOTE_ENDPOINT_MISSING:${candidate.agentId}`);
+        const response = await fetch(candidate.endpoint, {
           method: "POST",
           headers: { "content-type": "application/json", "idempotency-key": request.idempotencyKey ?? request.id },
           body: JSON.stringify(request),
-          signal: ctl.signal,
+          signal,
         });
         if (!response.ok) throw new Error(`REMOTE_AGENT_${response.status}`);
-        const bundle = await response.json() as EvidenceBundle;
-        await saveJson(join(this.config.stateDir, "delegated", `${request.id}.json`), { decision, bundle });
-        return bundle;
-      } finally { clearTimeout(timer); }
+        const remoteBundle = await response.json() as EvidenceBundle;
+        const delegatorVerification = verifyExternalProfile("flop-agent", remoteBundle);
+        if (delegatorVerification.result === "FAIL") throw new Error("REMOTE_EVIDENCE_VERIFICATION_FAILED");
+        return { kind: "remote" as const, bundle: { ...remoteBundle, delegatorVerification } };
+      },
+    );
+
+    if (routed.value.kind === "remote") {
+      await saveJson(join(this.config.stateDir, "delegated", `${request.id}.json`), { decision: routed.decision, bundle: routed.value.bundle });
+      return routed.value.bundle;
     }
-    const result = await executeWork(this.config, request);
-    const receipt = buildReceipt(request, decision, result);
-    const bundle = buildEvidence(receipt);
+    const receipt = buildReceipt(request, routed.decision, routed.value.result);
+    const selfChecked = buildEvidence(receipt);
+    const bundle = { ...selfChecked, independentVerification: verifyExternalProfile("flop-agent", selfChecked) };
     await publishArtifacts(this.config.stateDir, receipt, bundle);
     return bundle;
   }
@@ -69,7 +79,8 @@ export class FlopAgent {
     }], this.config.stateDir);
     const result = await executeWork(this.config, request);
     const receipt = buildReceipt(request, decision, result);
-    const bundle = buildEvidence(receipt);
+    const selfChecked = buildEvidence(receipt);
+    const bundle = { ...selfChecked, independentVerification: verifyExternalProfile("flop-agent", selfChecked) };
     await publishArtifacts(this.config.stateDir, receipt, bundle);
     await saveJson(cachePath, bundle);
     return bundle;

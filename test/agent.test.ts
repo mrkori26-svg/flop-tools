@@ -4,6 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FlopAgent } from "../src/agent.js";
+import { executeRoutedWork } from "../src/router-adapter.js";
 import type { AgentConfig } from "../src/types.js";
 
 test("incoming work is idempotent and routed by Session Router", async () => {
@@ -34,5 +35,31 @@ test("incoming work is idempotent and routed by Session Router", async () => {
     assert.equal(first.portableReceipt.work_id, "work-1");
   } finally {
     await rm(root, { recursive:true, force:true });
+  }
+});
+
+test("Session Router fails over to the next eligible agent", async () => {
+  const root = await mkdtemp(join(tmpdir(), "flop-agent-failover-"));
+  try {
+    const candidates = [
+      {agentId:"agent-a",capabilities:["research"],runtimeKind:"http" as const,endpoint:"http://a.invalid/work",observedAt:new Date().toISOString()},
+      {agentId:"agent-b",capabilities:["research"],runtimeKind:"http" as const,endpoint:"http://b.invalid/work",observedAt:new Date().toISOString()},
+    ];
+    const routed = await executeRoutedWork(
+      {id:"work-failover",capability:"research",input:{}},
+      candidates,
+      join(root,"state"),
+      2,
+      2000,
+      async candidate => {
+        if (candidate.agentId === "agent-a") throw new Error("simulated-unavailable");
+        return { ok:true, agentId:candidate.agentId };
+      },
+    );
+    assert.equal(routed.decision.sessionRouter?.initialSelectedAgentId, "agent-a");
+    assert.equal(routed.decision.selectedAgentId, "agent-b");
+    assert.deepEqual(routed.value, {ok:true,agentId:"agent-b"});
+  } finally {
+    await rm(root, {recursive:true,force:true});
   }
 });

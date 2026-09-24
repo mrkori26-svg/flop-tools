@@ -56,6 +56,7 @@ export interface RouteDecision {
     decisionId: string;
     snapshotHash: string;
     configHash: string;
+    initialSelectedAgentId?: string;
   };
 }
 
@@ -90,5 +91,6 @@ export interface EvidenceBundle {
     checks: Record<string, boolean>;
   };
   independentVerification?: PortableConformanceResult;
+  delegatorVerification?: PortableConformanceResult;
   createdAt: string;
 }
