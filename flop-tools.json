@@ -1,0 +1,16 @@
+{
+  "schema": "flop-tools-ecosystem/v1",
+  "name": "FLOP Tools",
+  "tagline": "Route -> Prove -> Observe",
+  "core": {
+    "route": "https://github.com/retardio73-boop/flop-session-router",
+    "prove": "https://github.com/retardio73-boop/flop-conformance-lab",
+    "observe": "https://github.com/retardio73-boop/flop-control-center"
+  },
+  "components": {
+    "execution_receipt": "https://github.com/retardio73-boop/flop-work-execution-receipt",
+    "reference_application": "https://github.com/retardio73-boop/flop-empires"
+  },
+  "status": "alpha-community",
+  "official_flop_labs_product": false
+}
