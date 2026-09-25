@@ -32,6 +32,8 @@ The builder should not need to understand Receipt, EvidenceBundle or Conformance
 
 ## Quick start
 
+> Distribution note: 0.1.0 is currently a source-workspace alpha. Router, Receipt and Lab are sibling packages and are not yet published to npm.
+
 ```bash
 npm install
 npm run build
@@ -40,14 +42,22 @@ node dist/src/cli.js publish
 node dist/src/cli.js run --capability research --input "{\"task\":\"summarize\"}"
 ```
 
-To receive work:
+To receive work over HTTP:
 
 ```bash
 node dist/src/cli.js serve --port 8787
 ```
 
+To expose the same RUN surface over MCP stdio:
+
+```bash
+npm run mcp -- --config flop-agent.json
+```
+
+MCP tools: `flop_agent_run`, `flop_agent_publish`, `flop_agent_candidates`, and `flop_agent_doctor`.
+
 Every completed request persists a receipt, evidence bundle, latest snapshot and append-only observation record under the configured state directory.
 
 For signed ecosystem discovery, configure Technocore and run `flop-agent doctor` before `publish`. The signer remains outside the Node process and discovered advertisements are signature-verified.
 
-See `docs/ARCHITECTURE.md`, `docs/TECHNOCORE.md` and `ADOPTION.md`.
+See `docs/ARCHITECTURE.md`, `docs/TECHNOCORE.md`, `docs/MCP.md` and `ADOPTION.md`.

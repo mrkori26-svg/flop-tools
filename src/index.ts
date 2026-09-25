@@ -5,3 +5,5 @@ export * from "./router-adapter.js";
 export * from "./technocore.js";
 export * from "./interop.js";
 export * from "./agent.js";
+export * from "./diagnostics.js";
+export * from "./mcp.js";

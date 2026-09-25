@@ -3,7 +3,8 @@ import { createServer } from "node:http";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { FlopAgent } from "./agent.js";
-import { technocoreSignerStatus } from "./technocore.js";
+import { diagnoseAgent } from "./diagnostics.js";
+import { serveMcp } from "./mcp.js";
 import { loadConfig, newWorkId, validateWorkRequest } from "./core.js";
 import type { AgentConfig, WorkRequest } from "./types.js";
 
@@ -135,33 +136,9 @@ async function demo() {
 }
 
 async function doctor() {
-  const config = await loadConfig(configPath);
-  const agent = new FlopAgent(config);
-  const checks: Record<string, unknown> = {
-    config: "PASS",
-    agentId: config.id,
-    capabilities: config.capabilities,
-    discovery: config.discovery?.kind ?? "local",
-  };
-  if (!config.capabilities.length) checks.config = "FAIL:NO_CAPABILITIES";
-  if (config.discovery?.kind === "technocore") {
-    const signer = await technocoreSignerStatus(config);
-    checks.signer = signer;
-    try {
-      const candidates = await agent.candidates();
-      checks.discoveryRead = {ok:true,candidates:candidates.length};
-    } catch (error) {
-      checks.discoveryRead = {ok:false,error:error instanceof Error?error.message:String(error)};
-    }
-  } else {
-    checks.discoveryRead = {ok:true,candidates:(await agent.candidates()).length};
-  }
-  const failed = Object.values(checks).some(value =>
-    typeof value === "string" ? value.startsWith("FAIL") :
-    value && typeof value === "object" && "ok" in value && (value as {ok?:boolean}).ok === false
-  );
-  console.log(JSON.stringify({schema:"flop-agent-doctor/v1",status:failed?"FAIL":"PASS",checks}, null, 2));
-  if (failed) process.exitCode = 1;
+  const report = await diagnoseAgent(await loadConfig(configPath));
+  console.log(JSON.stringify(report, null, 2));
+  if (report.status === "FAIL") process.exitCode = 1;
 }
 
 async function main() {
@@ -171,7 +148,8 @@ async function main() {
   if (cmd === "serve") return serve();
   if (cmd === "demo") return demo();
   if (cmd === "doctor") return doctor();
-  console.log("flop-agent <init|publish|run|serve|demo|doctor> [--config flop-agent.json]");
+  if (cmd === "mcp") return serveMcp(configPath);
+  console.log("flop-agent <init|publish|run|serve|demo|doctor|mcp> [--config flop-agent.json]");
   console.log("init options: --discovery local|technocore --room <room> --signer-command <path> --signer-args '[\"script.py\"]'");
 }
 main().catch(error => { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; });

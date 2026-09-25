@@ -22,7 +22,7 @@ identity/config
 
 ## Runtime adapters
 
-Current alpha supports shell and HTTP RuntimeTargets. The contract is intentionally narrow so MCP, A2A, Technocore and protocol-specific adapters can be added without changing the builder-facing command surface.
+Current alpha supports shell and HTTP RuntimeTargets. MCP stdio is a control/access surface over the same orchestration, not a separate RuntimeTarget. The runtime contract remains intentionally narrow so A2A, Technocore and protocol-specific execution adapters can be added without changing the builder-facing work API.
 
 ## Evidence semantics
 

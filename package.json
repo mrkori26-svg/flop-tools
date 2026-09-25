@@ -3,24 +3,51 @@
   "version": "0.1.0",
   "description": "RUN surface for FLOP Tools: execute agent work reliably and emit verifiable evidence automatically.",
   "type": "module",
-  "bin": { "flop-agent": "dist/src/cli.js" },
-  "exports": { ".": "./dist/src/index.js" },
-  "files": ["dist/src","README.md","ECOSYSTEM.md","ADOPTION.md","docs","examples"],
-  "engines": { "node": ">=22.13" },
+  "bin": {
+    "flop-agent": "dist/src/cli.js"
+  },
+  "exports": {
+    ".": "./dist/src/index.js"
+  },
+  "files": [
+    "dist/src",
+    "README.md",
+    "ECOSYSTEM.md",
+    "ADOPTION.md",
+    "docs",
+    "examples"
+  ],
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && node --test dist/test/*.test.js",
     "pack:check": "npm pack --dry-run",
     "check": "npm run typecheck && npm test && npm run pack:check",
-    "quickstart": "npm run build && node dist/src/cli.js demo"
+    "quickstart": "npm run build && node dist/src/cli.js demo",
+    "mcp": "npm run build && node dist/src/cli.js mcp"
   },
-  "keywords": ["flop","agents","runtime","routing","evidence","technocore","a2a"],
+  "keywords": [
+    "flop",
+    "agents",
+    "runtime",
+    "routing",
+    "evidence",
+    "technocore",
+    "a2a"
+  ],
   "license": "Apache-2.0",
   "dependencies": {
+    "@flop-tools/conformance-lab": "file:../flop-conformance-lab",
     "@flop-tools/session-router": "file:../flop-session-router",
     "@flop-tools/work-execution-receipt": "file:../flop-work-execution-receipt",
-    "@flop-tools/conformance-lab": "file:../flop-conformance-lab"
+    "@modelcontextprotocol/server": "^2.1.0",
+    "zod": "^4.6.5"
   },
-  "devDependencies": { "@types/node": "^24.0.0", "typescript": "^5.9.0" }
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
 }
