@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { FlopAgent } from "./agent.js";
 import { diagnoseAgent } from "./diagnostics.js";
 import { serveMcp } from "./mcp.js";
-import { loadConfig, newWorkId, validateWorkRequest } from "./core.js";
+import { loadConfig, newWorkId, validateAgentConfig, validateWorkRequest } from "./core.js";
 import type { AgentConfig, WorkRequest } from "./types.js";
 
 const args = process.argv.slice(2);
@@ -22,13 +22,24 @@ async function init() {
   if (!["local","technocore"].includes(discoveryKind)) throw new Error("INVALID_DISCOVERY_KIND");
   const signerCommand = value("--signer-command");
   const signerArgs = value("--signer-args");
+  const endpoint = value("--endpoint");
+  const runtimeKind = value("--runtime", "shell") as "shell" | "http";
+  if (!["shell","http"].includes(runtimeKind)) throw new Error("INVALID_RUNTIME");
+  if (discoveryKind === "technocore" && !endpoint) throw new Error("TECHNOCORE_PUBLIC_ENDPOINT_REQUIRED");
+  if (discoveryKind === "technocore" && !signerCommand) throw new Error("TECHNOCORE_SIGNER_NOT_CONFIGURED");
+  const runtimeCommand = value("--runtime-command", process.execPath);
+  const runtimeArgs = value("--runtime-args");
+  const runtimeUrl = value("--runtime-url");
+  if (runtimeKind === "http" && !runtimeUrl) throw new Error("HTTP_URL_MISSING");
+  const timeoutMs = Number(value("--timeout-ms", "10000"));
+  const maxAttempts = Number(value("--max-attempts", "2"));
   const config: AgentConfig = {
     id: value("--id", "local-agent")!,
     name: value("--name", "Local FLOP Agent")!,
     capabilities: (value("--capabilities", "general") ?? "general").split(",").map(x => x.trim()).filter(Boolean),
     registryPath: resolve(value("--registry", ".flop/registry.json")!),
     stateDir: resolve(value("--state", ".flop/state")!),
-    advertiseEndpoint: value("--endpoint", "http://127.0.0.1:8787/work"),
+    advertiseEndpoint: endpoint ?? "http://127.0.0.1:8787/work",
     auth: value("--token-env") ? { tokenEnv: value("--token-env") } : undefined,
     discovery: discoveryKind === "technocore" ? {
       kind: "technocore",
@@ -36,16 +47,22 @@ async function init() {
       baseUrl: value("--technocore-url", "https://technocore.chat"),
       signer: signerCommand ? { command: signerCommand, args: signerArgs ? JSON.parse(signerArgs) : [] } : undefined,
     } : { kind: "local" },
-    runtime: {
+    runtime: runtimeKind === "http" ? {
+      kind: "http",
+      url: runtimeUrl,
+      timeoutMs,
+      maxAttempts,
+    } : {
       kind: "shell",
-      command: process.execPath,
-      args: ["-e", "const x=JSON.parse(process.argv[1]); console.log(JSON.stringify({ok:true,input:x}))"],
-      timeoutMs: 10000,
-      maxAttempts: 2,
+      command: runtimeCommand,
+      args: runtimeArgs ? JSON.parse(runtimeArgs) : ["-e", "const x=JSON.parse(process.argv[1]); console.log(JSON.stringify({ok:true,input:x}))"],
+      timeoutMs,
+      maxAttempts,
     },
   };
+  const validated = validateAgentConfig(config);
   await mkdir(resolve(cwd, ".flop"), { recursive: true });
-  await writeFile(configPath, JSON.stringify(config, null, 2) + "\n", "utf8");
+  await writeFile(configPath, JSON.stringify(validated, null, 2) + "\n", "utf8");
   console.log(configPath);
 }
 
@@ -150,6 +167,7 @@ async function main() {
   if (cmd === "doctor") return doctor();
   if (cmd === "mcp") return serveMcp(configPath);
   console.log("flop-agent <init|publish|run|serve|demo|doctor|mcp> [--config flop-agent.json]");
-  console.log("init options: --discovery local|technocore --room <room> --signer-command <path> --signer-args '[\"script.py\"]'");
+  console.log("init options: --discovery local|technocore --endpoint <https-url> --room <room> --signer-command <path> --signer-args '[\"script.py\"]'");
+  console.log("runtime options: --runtime shell|http --runtime-command <path> --runtime-args '[\"arg\"]' --runtime-url <url> --timeout-ms <ms> --max-attempts <n>");
 }
 main().catch(error => { console.error(error instanceof Error ? error.message : error); process.exitCode = 1; });

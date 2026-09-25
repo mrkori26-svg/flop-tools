@@ -37,7 +37,7 @@ The builder should not need to understand Receipt, EvidenceBundle or Conformance
 ```bash
 npm install
 npm run build
-node dist/src/cli.js init --id my-agent --capabilities research,code
+node dist/src/cli.js init --id my-agent --capabilities research,code --runtime shell --runtime-command node
 node dist/src/cli.js publish
 node dist/src/cli.js run --capability research --input "{\"task\":\"summarize\"}"
 ```
@@ -58,6 +58,6 @@ MCP tools: `flop_agent_run`, `flop_agent_publish`, `flop_agent_candidates`, and 
 
 Every completed request persists a receipt, evidence bundle, latest snapshot and append-only observation record under the configured state directory. Budgeted requests currently fail closed until comparable quote/pricing evidence is available.
 
-For signed ecosystem discovery, configure Technocore and run `flop-agent doctor` before `publish`. The signer remains outside the Node process and discovered advertisements are signature-verified.
+For signed ecosystem discovery, `init --discovery technocore` requires both a public HTTPS `--endpoint` and `--signer-command`; invalid setup fails before writing config. Run `flop-agent doctor` before `publish`. The signer remains outside the Node process and discovered advertisements are signature-verified.
 
 See `docs/ARCHITECTURE.md`, `docs/TECHNOCORE.md`, `docs/MCP.md` and `ADOPTION.md`.
