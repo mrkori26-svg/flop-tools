@@ -114,7 +114,8 @@ export async function executeRoutedWork<T>(
       },
     });
     if (outcome.status !== "completed" || !outcome.selectedMinerId) {
-      throw new Error(`ROUTED_EXECUTION_FAILED:${outcome.status}`);
+      const reason = outcome.attempts.at(-1)?.reason ?? "UNKNOWN";
+      throw new Error(`ROUTED_EXECUTION_FAILED:${outcome.status}:${reason}`);
     }
     const value = values.get(outcome.selectedMinerId);
     if (value === undefined) throw new Error("ROUTED_EXECUTION_RESULT_MISSING");

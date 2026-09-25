@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -82,7 +82,11 @@ test("one FLOP Agent delegates real HTTP work and independently re-verifies the 
     const chunks: Buffer[] = [];
     for await (const chunk of req) chunks.push(Buffer.from(chunk));
     try {
-      const bundle = await remote.executeIncoming(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+      const incoming = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      const bundle = await remote.executeIncoming(incoming);
+      if (incoming.id === "work-bad-binding") {
+        bundle.receipt.executor = "spoofed-agent";
+      }
       res.writeHead(200,{"content-type":"application/json"});
       res.end(JSON.stringify(bundle));
     } catch (error) {
@@ -110,6 +114,18 @@ test("one FLOP Agent delegates real HTTP work and independently re-verifies the 
     assert.equal(bundle.receipt.result.status, "completed");
     assert.equal(bundle.independentVerification?.result, "PASS");
     assert.equal(bundle.delegatorVerification?.result, "PASS");
+    const observationPath = join(root,"client-state","observations","raw","runtime.ndjson");
+    const observations = (await readFile(observationPath,"utf8")).trim().split("\n").map(line => JSON.parse(line));
+    assert.equal(observations.length, 2);
+    assert.ok(observations.every(item => item.dimensions?.role === "delegator"));
+    assert.ok(observations.every(item => item.outcome === "PASS"));
+
+    await assert.rejects(
+      new FlopAgent(clientConfig).run({
+        id:"work-bad-binding",capability:"research",input:{task:"spoof"},idempotencyKey:"remote-spoof",
+      }),
+      /REMOTE_IDENTITY_BINDING_FAILED/,
+    );
   } finally {
     await new Promise<void>(resolve => server.close(()=>resolve()));
     await rm(root,{recursive:true,force:true});

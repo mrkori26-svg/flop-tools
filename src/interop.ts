@@ -5,7 +5,7 @@ import {
   makeObservation,
   type ObservationRecord,
 } from "@flop-tools/conformance-lab";
-import type { EvidenceBundle, WorkReceipt } from "./types.js";
+import type { EvidenceBundle, RouteDecision, WorkReceipt, WorkRequest } from "./types.js";
 import { saveJson } from "./core.js";
 
 export async function publishArtifacts(
@@ -86,4 +86,71 @@ export async function publishArtifacts(
     observations,
   });
   return { receiptPath, bundlePath, observationPath };
+}
+
+export async function publishDelegatedObservation(
+  stateDir: string,
+  request: WorkRequest,
+  decision: RouteDecision,
+  bundle: EvidenceBundle,
+): Promise<string> {
+  const observationRoot = join(stateDir, "observations");
+  const observationPath = join(observationRoot, "raw", "runtime.ndjson");
+  const remoteOk = bundle.receipt.result.status === "completed";
+  const verification = bundle.delegatorVerification?.result;
+  const evidenceRefs = [
+    bundle.bundleId,
+    bundle.receipt.receiptId,
+    bundle.portableReceipt.receipt_id,
+  ].filter((value): value is string => typeof value === "string");
+  const dimensions = {
+    kind: "agent-work",
+    role: "delegator",
+    workId: request.id,
+    executor: bundle.receipt.executor,
+    routeDecisionId: decision.sessionRouter?.decisionId ?? "not-available",
+    remoteReceiptId: bundle.receipt.receiptId,
+  };
+  const runtimeObservation = makeObservation({
+    observedAt: new Date().toISOString(),
+    source: "runtime",
+    metric: "runtime_availability",
+    outcome: remoteOk ? "PASS" : "FAIL",
+    numerator: remoteOk ? 1 : 0,
+    denominator: 1,
+    dimensions,
+    failure: remoteOk ? null : {
+      scope: "TARGET_FAILURE",
+      class: "TARGET_PROTOCOL_ERROR",
+      detail: bundle.receipt.result.error ?? "delegated work failed",
+    },
+    evidenceRefs,
+    observerRevision: detectGitRevision(),
+    sourceRevision: null,
+    targetFingerprint: decision.sessionRouter?.snapshotHash ?? null,
+  });
+  const conformanceObservation = makeObservation({
+    observedAt: runtimeObservation.observedAt,
+    source: "runtime",
+    metric: "conformance_drift",
+    outcome: verification === "PASS" ? "PASS" : verification === "FAIL" ? "FAIL" : "UNKNOWN",
+    numerator: verification === "PASS" ? 1 : 0,
+    denominator: verification === undefined ? 0 : 1,
+    dimensions: {
+      ...dimensions,
+      profile: bundle.delegatorVerification?.profile ?? "flop-agent",
+      verification: verification ?? "UNKNOWN",
+    },
+    failure: verification === "FAIL"
+      ? { scope:"TARGET_FAILURE", class:"CONFORMANCE_FAIL", detail:"delegator verification failed" }
+      : verification === undefined
+        ? { scope:"INDETERMINATE", class:"COVERAGE_LOST", detail:"delegator verification unavailable" }
+        : null,
+    evidenceRefs,
+    observerRevision: detectGitRevision(),
+    sourceRevision: bundle.delegatorVerification?.labVersion ?? null,
+    targetFingerprint: decision.sessionRouter?.snapshotHash ?? null,
+  });
+  appendObservations(observationRoot, [runtimeObservation, conformanceObservation]);
+  return observationPath;
 }

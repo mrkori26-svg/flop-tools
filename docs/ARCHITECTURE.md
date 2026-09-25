@@ -45,4 +45,6 @@ RUN now delegates specialized responsibilities instead of duplicating them:
 - Conformance Lab independently verifies every locally executed bundle with the `flop-agent` profile.
 - Control Center consumes append-only `ObservationRecord v1` events through its agent-work observatory.
 
-The local self-check is explicitly separate from independent Lab verification. Neither layer infers payment settlement, economic finality, external independence or complete coverage without evidence for those claims.
+The local self-check is explicitly separate from independent Lab verification. For delegated work, the initiator also verifies that the returned receipt is bound to the Router-selected peer and independently re-runs the `flop-agent` Lab profile. Both runtime and conformance observations are appended locally with `role=delegator`, so longitudinal history does not disappear merely because execution happened elsewhere.
+
+Neither layer infers payment settlement, economic finality, external independence or complete coverage without evidence for those claims.

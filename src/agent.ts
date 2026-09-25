@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { verifyExternalProfile } from "@flop-tools/conformance-lab";
 import { advertise, buildEvidence, buildReceipt, digest, discover, saveJson } from "./core.js";
-import { publishArtifacts } from "./interop.js";
+import { publishArtifacts, publishDelegatedObservation } from "./interop.js";
 import { executeRoutedWork, routeWithSessionRouter } from "./router-adapter.js";
 import { executeWork } from "./runtime.js";
 import { discoverTechnocore, publishTechnocore } from "./technocore.js";
@@ -61,6 +61,10 @@ export class FlopAgent {
         });
         if (!response.ok) throw new Error(`REMOTE_AGENT_${response.status}`);
         const remoteBundle = await response.json() as EvidenceBundle;
+        if (remoteBundle.receipt?.executor !== candidate.agentId ||
+            remoteBundle.receipt?.route?.selectedAgentId !== candidate.agentId) {
+          throw new Error("REMOTE_IDENTITY_BINDING_FAILED");
+        }
         const delegatorVerification = verifyExternalProfile("flop-agent", remoteBundle);
         if (delegatorVerification.result === "FAIL") throw new Error("REMOTE_EVIDENCE_VERIFICATION_FAILED");
         return { kind: "remote" as const, bundle: { ...remoteBundle, delegatorVerification } };
@@ -69,6 +73,7 @@ export class FlopAgent {
 
     if (routed.value.kind === "remote") {
       await saveJson(join(this.config.stateDir, "delegated", `${request.id}.json`), { decision: routed.decision, bundle: routed.value.bundle });
+      await publishDelegatedObservation(this.config.stateDir, request, routed.decision, routed.value.bundle);
       return routed.value.bundle;
     }
     const receipt = buildReceipt(request, routed.decision, routed.value.result);
