@@ -37,6 +37,7 @@ export class FlopAgent {
   }
 
   async run(request: WorkRequest): Promise<EvidenceBundle> {
+    if (request.budget) throw new Error("BUDGET_ENFORCEMENT_UNAVAILABLE");
     const candidates = await this.candidates();
     const routed = await executeRoutedWork(
       request,
@@ -78,6 +79,7 @@ export class FlopAgent {
   }
 
   async executeIncoming(request: WorkRequest): Promise<EvidenceBundle> {
+    if (request.budget) throw new Error("BUDGET_ENFORCEMENT_UNAVAILABLE");
     const idempotencyKey = request.idempotencyKey ?? request.id;
     const cachePath = join(this.config.stateDir, "idempotency", `${digest(idempotencyKey).slice(7)}.json`);
     try {

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildEvidence, buildReceipt, digest, route, validateWorkRequest } from "../src/core.js";
+import { buildEvidence, buildReceipt, digest, route, validateAgentConfig, validateWorkRequest } from "../src/core.js";
 
 test("digest is deterministic across object key order", () => {
   assert.equal(digest({a:1,b:2}), digest({b:2,a:1}));
@@ -39,4 +39,22 @@ test("work request validation rejects malformed capabilities and budgets", () =>
   assert.throws(() => validateWorkRequest({id:"x",capability:"bad capability",input:{}}), /INVALID_WORK_CAPABILITY/);
   assert.throws(() => validateWorkRequest({id:"x",capability:"research",input:{},budget:{amount:"1.2",asset:"USDC"}}), /INVALID_WORK_BUDGET/);
   assert.equal(validateWorkRequest({id:"x",capability:"research",input:{}}).capability, "research");
+});
+
+test("agent config validation fails closed on unsafe runtime settings", () => {
+  const base = {
+    id:"agent-a", name:"Agent A", capabilities:["research"],
+    registryPath:".flop/registry.json", stateDir:".flop/state",
+    discovery:{kind:"local"},
+    runtime:{kind:"shell",command:process.execPath,timeoutMs:1000,maxAttempts:1},
+  };
+  assert.equal(validateAgentConfig(base).id, "agent-a");
+  assert.throws(
+    () => validateAgentConfig({...base,runtime:{...base.runtime,maxAttempts:0}}),
+    /INVALID_RUNTIME_ATTEMPTS/,
+  );
+  assert.throws(
+    () => validateAgentConfig({...base,capabilities:["bad capability"]}),
+    /INVALID_AGENT_CAPABILITIES/,
+  );
 });

@@ -115,3 +115,21 @@ test("one FLOP Agent delegates real HTTP work and independently re-verifies the 
     await rm(root,{recursive:true,force:true});
   }
 });
+
+test("budgeted work fails closed until comparable pricing exists", async () => {
+  const config: AgentConfig = {
+    id:"agent-budget", name:"Budget Agent", capabilities:["research"],
+    registryPath:"unused", stateDir:"unused",
+    discovery:{kind:"local"},
+    runtime:{kind:"shell",command:process.execPath,args:["-e","console.log('{}')"],timeoutMs:1000,maxAttempts:1},
+  };
+  await assert.rejects(
+    new FlopAgent(config).executeIncoming({
+      id:"budget-work",
+      capability:"research",
+      input:{},
+      budget:{amount:"10",asset:"USDC"},
+    }),
+    /BUDGET_ENFORCEMENT_UNAVAILABLE/,
+  );
+});

@@ -32,7 +32,9 @@ No payment, economic finality, external independence or cross-implementation con
 
 ## Reliability semantics
 
-Runtime configuration controls timeout and retry budget. HTTP execution carries an idempotency key. State artifacts are append-only at the observation index and immutable by identifier for receipts and bundles.
+Runtime configuration controls timeout and retry count. HTTP execution carries an idempotency key. State artifacts are append-only at the observation index and immutable by identifier for receipts and bundles.
+
+Economic `budget` constraints are fail-closed in 0.1.0. Until ROUTE can obtain a comparable, provenance-bound quote, a budgeted request returns `BUDGET_ENFORCEMENT_UNAVAILABLE` rather than pretending the limit was enforced.
 
 ## Integrated composition
 

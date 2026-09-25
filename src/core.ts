@@ -16,7 +16,7 @@ export const digest = (value: unknown): string =>
   "sha256:" + createHash("sha256").update(canonical(value)).digest("hex");
 
 export async function loadConfig(path: string): Promise<AgentConfig> {
-  return JSON.parse(await readFile(path, "utf8")) as AgentConfig;
+  return validateAgentConfig(JSON.parse(await readFile(path, "utf8")));
 }
 
 export async function saveJson(path: string, value: unknown): Promise<void> {
@@ -132,4 +132,56 @@ export function validateWorkRequest(value: unknown): WorkRequest {
     }
   }
   return value as WorkRequest;
+}
+
+export function validateAgentConfig(value: unknown): AgentConfig {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("INVALID_AGENT_CONFIG");
+  const item = value as Record<string, unknown>;
+  if (typeof item.id !== "string" || item.id.length < 1 || item.id.length > 256) throw new Error("INVALID_AGENT_ID");
+  if (typeof item.name !== "string" || item.name.length < 1 || item.name.length > 256) throw new Error("INVALID_AGENT_NAME");
+  if (!Array.isArray(item.capabilities) || item.capabilities.length < 1 ||
+      !item.capabilities.every(x => typeof x === "string" && /^[a-zA-Z0-9._:-]{1,128}$/.test(x))) {
+    throw new Error("INVALID_AGENT_CAPABILITIES");
+  }
+  if (typeof item.registryPath !== "string" || !item.registryPath) throw new Error("INVALID_REGISTRY_PATH");
+  if (typeof item.stateDir !== "string" || !item.stateDir) throw new Error("INVALID_STATE_DIR");
+
+  const runtime = item.runtime as Record<string, unknown> | undefined;
+  if (!runtime || (runtime.kind !== "shell" && runtime.kind !== "http")) throw new Error("INVALID_RUNTIME");
+  if (!Number.isSafeInteger(runtime.timeoutMs) || (runtime.timeoutMs as number) < 100 ||
+      (runtime.timeoutMs as number) > 300_000) throw new Error("INVALID_RUNTIME_TIMEOUT");
+  if (!Number.isSafeInteger(runtime.maxAttempts) || (runtime.maxAttempts as number) < 1 ||
+      (runtime.maxAttempts as number) > 10) throw new Error("INVALID_RUNTIME_ATTEMPTS");
+  if (runtime.kind === "shell" && (typeof runtime.command !== "string" || !runtime.command)) {
+    throw new Error("SHELL_COMMAND_MISSING");
+  }
+  if (runtime.kind === "http") {
+    if (typeof runtime.url !== "string" || !runtime.url) throw new Error("HTTP_URL_MISSING");
+    const url = new URL(runtime.url);
+    if (!["http:", "https:"].includes(url.protocol)) throw new Error("INVALID_RUNTIME_URL");
+  }
+
+  const discovery = item.discovery as Record<string, unknown> | undefined;
+  if (discovery) {
+    if (discovery.kind !== "local" && discovery.kind !== "technocore") throw new Error("INVALID_DISCOVERY_KIND");
+    if (discovery.kind === "technocore") {
+      if (typeof discovery.room !== "string" || !/^[a-z0-9][a-z0-9_-]{0,47}$/.test(discovery.room)) {
+        throw new Error("TECHNOCORE_ROOM_INVALID");
+      }
+      if (discovery.baseUrl !== undefined) {
+        if (typeof discovery.baseUrl !== "string") throw new Error("UNSAFE_TECHNOCORE_BASE_URL");
+        const url = new URL(discovery.baseUrl);
+        if (url.protocol !== "https:" &&
+            !(url.protocol === "http:" && ["127.0.0.1", "localhost", "::1"].includes(url.hostname))) {
+          throw new Error("UNSAFE_TECHNOCORE_BASE_URL");
+        }
+      }
+    }
+  }
+  const auth = item.auth as Record<string, unknown> | undefined;
+  if (auth?.tokenEnv !== undefined &&
+      (typeof auth.tokenEnv !== "string" || !/^[A-Z_][A-Z0-9_]*$/i.test(auth.tokenEnv))) {
+    throw new Error("INVALID_AUTH_TOKEN_ENV");
+  }
+  return value as AgentConfig;
 }
