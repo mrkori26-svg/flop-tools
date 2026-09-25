@@ -3,6 +3,7 @@ export * from "./core.js";
 export * from "./runtime.js";
 export * from "./router-adapter.js";
 export * from "./technocore.js";
+export * from "./endpoint-policy.js";
 export * from "./interop.js";
 export * from "./agent.js";
 export * from "./diagnostics.js";

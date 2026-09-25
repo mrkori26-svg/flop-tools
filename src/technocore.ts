@@ -1,6 +1,7 @@
 import { createPublicKey, verify as verifySignature } from "node:crypto";
 import { spawn } from "node:child_process";
 import type { AgentAdvertisement, AgentConfig, Candidate } from "./types.js";
+import { assertPublicAgentEndpoint } from "./endpoint-policy.js";
 
 const PREFIX = "FLOP_AGENT_V1:";
 const BASE58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -124,9 +125,23 @@ export async function discoverTechnocore(config: AgentConfig): Promise<Candidate
   const value = JSON.parse(raw.toString("utf8")) as { messages?: TechnocoreMessage[] };
   if (!Array.isArray(value.messages)) throw new Error("TECHNOCORE_ROOM_INVALID_RESPONSE");
   const latest = new Map<string, Candidate>();
+  const endpointChecks = new Map<string, Promise<URL>>();
   for (const message of value.messages) {
     const candidate = parseAdvertisement(room, message);
-    if (candidate) latest.set(candidate.agentId, candidate);
+    if (!candidate) continue;
+    if (candidate.endpoint) {
+      try {
+        let check = endpointChecks.get(candidate.endpoint);
+        if (!check) {
+          check = assertPublicAgentEndpoint(candidate.endpoint);
+          endpointChecks.set(candidate.endpoint, check);
+        }
+        await check;
+      } catch {
+        continue;
+      }
+    }
+    latest.set(candidate.agentId, candidate);
   }
   return [...latest.values()].sort((a,b) => a.agentId.localeCompare(b.agentId));
 }
@@ -134,6 +149,8 @@ export async function discoverTechnocore(config: AgentConfig): Promise<Candidate
 export async function publishTechnocore(config: AgentConfig, item: AgentAdvertisement): Promise<AgentAdvertisement> {
   const room = config.discovery?.room;
   if (!room || !/^[a-z0-9][a-z0-9_-]{0,47}$/.test(room)) throw new Error("TECHNOCORE_ROOM_INVALID");
+  if (!item.endpoint) throw new Error("TECHNOCORE_PUBLIC_ENDPOINT_REQUIRED");
+  await assertPublicAgentEndpoint(item.endpoint);
   const text = encodeAdvertisement(item);
   const signedResponse = await signerRequest(config, { operation:"sign_technocore_room_message", room, text });
   const signed = signedResponse?.ok === true ? signedResponse.signed : undefined;

@@ -9,6 +9,8 @@ FLOP Agent can use Technocore as a signed capability-discovery transport while k
 - The configured agent id must exactly match the DID returned by the signer.
 - Every discovered advertisement is independently verified as Ed25519 `did:key` over the exact Technocore payload `room|nonce|text`.
 - Invalid signatures, malformed advertisements and identity mismatches are ignored or fail closed.
+- Technocore advertisements must expose an HTTPS work endpoint that resolves only to public IP addresses; loopback, link-local, private, CGNAT and multicast ranges are rejected.
+- The endpoint policy is rechecked immediately before delegated execution to reduce DNS-rebinding/SSRF exposure.
 - Room timestamps are retained as transport metadata; they are not treated as signed time authority.
 
 ## Configuration

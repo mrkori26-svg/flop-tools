@@ -6,6 +6,7 @@ import { publishArtifacts } from "./interop.js";
 import { executeRoutedWork, routeWithSessionRouter } from "./router-adapter.js";
 import { executeWork } from "./runtime.js";
 import { discoverTechnocore, publishTechnocore } from "./technocore.js";
+import { assertPublicAgentEndpoint } from "./endpoint-policy.js";
 import type { AgentAdvertisement, AgentConfig, EvidenceBundle, WorkRequest } from "./types.js";
 
 async function upsertAdvertisement(path: string, item: AgentAdvertisement): Promise<void> {
@@ -48,6 +49,9 @@ export class FlopAgent {
           return { kind: "local" as const, result: await executeWork(this.config, request) };
         }
         if (!candidate.endpoint) throw new Error(`REMOTE_ENDPOINT_MISSING:${candidate.agentId}`);
+        if (this.config.discovery?.kind === "technocore") {
+          await assertPublicAgentEndpoint(candidate.endpoint);
+        }
         const response = await fetch(candidate.endpoint, {
           method: "POST",
           headers: { "content-type": "application/json", "idempotency-key": request.idempotencyKey ?? request.id },

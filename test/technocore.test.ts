@@ -20,7 +20,7 @@ function base58(data: Buffer): string {
   return "1".repeat(zeroes) + out;
 }
 
-function fixtureMessage(room: string, mutate = false) {
+function fixtureMessage(room: string, mutate = false, endpoint = "https://8.8.8.8/work") {
   const { privateKey, publicKey } = generateKeyPairSync("ed25519");
   const der = publicKey.export({format:"der",type:"spki"}) as Buffer;
   const raw = der.subarray(-32);
@@ -29,7 +29,7 @@ function fixtureMessage(room: string, mutate = false) {
     schema:"flop.agent-advertisement/v1",
     capabilities:["research"],
     runtimeKind:"http",
-    endpoint:"http://127.0.0.1:9999/work",
+    endpoint,
   };
   const text = "FLOP_AGENT_V1:" + Buffer.from(JSON.stringify(advertisement)).toString("base64url");
   const nonce = "123456789";
@@ -76,12 +76,19 @@ test("Technocore discovery accepts only cryptographically bound advertisements",
     assert.equal(candidates.length, 1);
     assert.equal(candidates[0]?.agentId, valid.from);
     assert.deepEqual(candidates[0]?.capabilities, ["research"]);
-    assert.equal(candidates[0]?.endpoint, "http://127.0.0.1:9999/work");
+    assert.equal(candidates[0]?.endpoint, "https://8.8.8.8/work");
   });
 });
 
 test("Technocore discovery rejects an unverified advertisement", async () => {
   await withServer([fixtureMessage("d-test", true)], async url => {
+    assert.deepEqual(await discoverTechnocore(config(url)), []);
+  });
+});
+
+test("Technocore discovery rejects signed private endpoints", async () => {
+  const privateEndpoint = fixtureMessage("d-test", false, "http://127.0.0.1:9999/work");
+  await withServer([privateEndpoint], async url => {
     assert.deepEqual(await discoverTechnocore(config(url)), []);
   });
 });
