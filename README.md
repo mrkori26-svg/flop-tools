@@ -60,4 +60,4 @@ Every completed request persists a receipt, evidence bundle, latest snapshot and
 
 For signed ecosystem discovery, `init --discovery technocore` requires both a public HTTPS `--endpoint` and `--signer-command`; invalid setup fails before writing config. Run `flop-agent doctor` before `publish`. The signer remains outside the Node process and discovered advertisements are signature-verified.
 
-See `docs/ARCHITECTURE.md`, `docs/TECHNOCORE.md`, `docs/MCP.md` and `ADOPTION.md`.
+See `docs/ARCHITECTURE.md`, `docs/TECHNOCORE.md`, `docs/MCP.md`, `docs/WINDOWS_OPERATIONS.md` and `ADOPTION.md`.

@@ -15,7 +15,8 @@
     "ECOSYSTEM.md",
     "ADOPTION.md",
     "docs",
-    "examples"
+    "examples",
+    "tools"
   ],
   "engines": {
     "node": ">=22.13"
