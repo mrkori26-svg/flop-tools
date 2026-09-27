@@ -23,7 +23,8 @@ function installRpc(overrides: Record<string,unknown>={}) {
     } else if(body.method==="eth_getTransactionByHash"){
       const h=body.params[0];
       const block=h===lockHash?"0x64":"0x65";
-      result={hash:h,from,to,value:"0x64",blockNumber:block,...(overrides[`tx:${h}`] as object??{})};
+      const value=h===lockHash?"0x64":"0x3c";
+      result={hash:h,from,to,value,blockNumber:block,...(overrides[`tx:${h}`] as object??{})};
     } else if(body.method==="eth_getTransactionReceipt"){
       const h=body.params[0];
       const block=h===lockHash?"0x64":"0x65";
@@ -95,7 +96,8 @@ test("EVM observer does not infer SAFE or FINALIZED when RPC finality heads are 
     else if(body.method==="eth_getTransactionByHash"){
       const h=body.params[0];
       const block=h===lockHash?"0x64":"0x65";
-      result={hash:h,from,to,value:"0x64",blockNumber:block};
+      const value=h===lockHash?"0x64":"0x3c";
+      result={hash:h,from,to,value,blockNumber:block};
     } else if(body.method==="eth_getTransactionReceipt"){
       const h=body.params[0];
       const block=h===lockHash?"0x64":"0x65";
@@ -109,4 +111,11 @@ test("EVM observer does not infer SAFE or FINALIZED when RPC finality heads are 
     const verified=verifyTestnetSettlement(observations,{reservationId:"r1",asset:"ETH",lockedAmount:"100",settledAmount:"60",minConfirmations:12,allowedNetworks:["sepolia"]});
     assert.equal(verified.status,"UNVERIFIED");
   }finally{globalThis.fetch=original;}
+});
+
+test("EVM observer rejects native value overshoot relative to the declared amount",async()=>{
+  const restore=installRpc({[`tx:${settleHash}`]:{value:"0x64"}});
+  try{
+    await assert.rejects(observeEvmTestnetSettlement(request()),/SETTLED_AMOUNT_MISMATCH/);
+  }finally{restore();}
 });

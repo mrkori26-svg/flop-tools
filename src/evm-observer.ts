@@ -68,7 +68,7 @@ async function one(
   if(!eqAddr(tx.to,part.to)||!eqAddr(tx.from,part.from)) throw new Error(`${kind}_PARTY_MISMATCH`);
   if(req.assetKind!=="NATIVE") throw new Error("EVM_ASSET_KIND_UNSUPPORTED");
   if(!/^[0-9]+$/.test(part.amount)) throw new Error(`${kind}_AMOUNT_INVALID`);
-  if(hex(tx.value)<BigInt(part.amount)) throw new Error(`${kind}_AMOUNT_UNDERSHOOT`);
+  if(hex(tx.value)!==BigInt(part.amount)) throw new Error(`${kind}_AMOUNT_MISMATCH`);
   const block=Number(hex(receipt.blockNumber));
   if(!Number.isSafeInteger(block)||block<0||!Number.isSafeInteger(latest)||latest<block) throw new Error(`${kind}_BLOCK_HEIGHT_INVALID`);
   const confirmations=latest-block+1;
