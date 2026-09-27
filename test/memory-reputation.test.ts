@@ -44,3 +44,20 @@ test("operational memory fails closed on malformed persisted history",async()=>{
   const mem=new OperationalMemory(path);
   await assert.rejects(mem.read(),/OPERATIONAL_MEMORY_CORRUPT_LINE_2/);
 });
+
+test("operational memory serializes concurrent writers and deduplicates identical records",async()=>{
+  const root=await mkdtemp(join(tmpdir(),"flop-memory-lock-"));
+  const path=join(root,"memory.ndjson");
+  const a=new OperationalMemory(path);
+  const b=new OperationalMemory(path);
+  const base={schema:"flop.operational-memory/v1" as const,at:new Date().toISOString(),counterparty:"did:a",capability:"conformance",workId:"w1",outcome:"COMPLETED" as const};
+  await Promise.all([
+    a.append(base),
+    b.append(base),
+    a.append({...base,workId:"w2"}),
+    b.append({...base,workId:"w3"}),
+  ]);
+  const rows=await a.read();
+  assert.equal(rows.filter(x=>x.workId==="w1").length,1);
+  assert.equal(rows.length,3);
+});
