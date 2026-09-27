@@ -1,0 +1,45 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout flop-tools
+        uses: actions/checkout@v4
+        with:
+          path: flop-tools
+      - name: Checkout economic runtime
+        uses: actions/checkout@v4
+        with:
+          repository: retardio73-boop/flop-economic-runtime
+          path: flop-economic-runtime
+      - name: Checkout session router
+        uses: actions/checkout@v4
+        with:
+          repository: retardio73-boop/flop-session-router
+          path: flop-session-router
+      - name: Checkout conformance lab
+        uses: actions/checkout@v4
+        with:
+          repository: retardio73-boop/flop-conformance-lab
+          path: flop-conformance-lab
+      - name: Checkout execution receipt
+        uses: actions/checkout@v4
+        with:
+          repository: retardio73-boop/flop-work-execution-receipt
+          path: flop-work-execution-receipt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install
+        working-directory: flop-tools
+        run: npm ci --ignore-scripts
+      - name: Verify
+        working-directory: flop-tools
+        run: npm run check
