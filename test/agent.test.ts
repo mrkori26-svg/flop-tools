@@ -185,3 +185,45 @@ test("Session Router cannot select a candidate that did not advertise the reques
     await rm(root,{recursive:true,force:true});
   }
 });
+
+
+test("concurrent identical idempotency requests execute only once", async () => {
+  const root=await mkdtemp(join(tmpdir(),"flop-agent-idem-concurrent-"));
+  try {
+    const countPath=join(root,"count.txt");
+    const script='const fs=require("fs"); fs.appendFileSync(process.argv[1],"x\\n"); setTimeout(()=>console.log(JSON.stringify({ok:true})),150);';
+    const config: AgentConfig = {
+      id:"agent-a", name:"Agent A", capabilities:["research"],
+      registryPath:join(root,"registry.json"), stateDir:join(root,"state"),
+      runtime:{kind:"shell",command:process.execPath,args:["-e",script,countPath],timeoutMs:5000,maxAttempts:1},
+    };
+    const agent=new FlopAgent(config);
+    const request={id:"work-concurrent",capability:"research",input:{q:"same"},idempotencyKey:"same-key"};
+    const [a,b]=await Promise.all([agent.executeIncoming(request),agent.executeIncoming(request)]);
+    assert.equal(a.bundleId,b.bundleId);
+    const lines=(await readFile(countPath,"utf8")).trim().split(/\r?\n/).filter(Boolean);
+    assert.equal(lines.length,1);
+  } finally {
+    await rm(root,{recursive:true,force:true});
+  }
+});
+
+test("concurrent idempotency key reuse with different payload fails closed", async () => {
+  const root=await mkdtemp(join(tmpdir(),"flop-agent-idem-race-"));
+  try {
+    const config: AgentConfig = {
+      id:"agent-a", name:"Agent A", capabilities:["research"],
+      registryPath:join(root,"registry.json"), stateDir:join(root,"state"),
+      runtime:{kind:"shell",command:process.execPath,args:["-e",'setTimeout(()=>console.log(JSON.stringify({ok:true})),150)'],timeoutMs:5000,maxAttempts:1},
+    };
+    const agent=new FlopAgent(config);
+    const first=agent.executeIncoming({id:"work-race",capability:"research",input:{q:"a"},idempotencyKey:"race-key"});
+    await assert.rejects(
+      agent.executeIncoming({id:"work-race",capability:"research",input:{q:"b"},idempotencyKey:"race-key"}),
+      /IDEMPOTENCY_KEY_REUSE_CONFLICT/,
+    );
+    await first;
+  } finally {
+    await rm(root,{recursive:true,force:true});
+  }
+});
