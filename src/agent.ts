@@ -18,6 +18,7 @@ async function upsertAdvertisement(path: string, item: AgentAdvertisement): Prom
 }
 
 export class FlopAgent {
+  private static readonly incomingInflight = new Map<string,{requestDigest:string;promise:Promise<EvidenceBundle>}>();
   constructor(readonly config: AgentConfig) {}
 
   async publish(): Promise<AgentAdvertisement> {
@@ -105,6 +106,28 @@ export class FlopAgent {
     } catch (error) {
       if (error instanceof Error && error.message === "IDEMPOTENCY_KEY_REUSE_CONFLICT") throw error;
     }
+
+    const existing=FlopAgent.incomingInflight.get(cacheBase);
+    if(existing){
+      if(existing.requestDigest!==requestDigest) throw new Error("IDEMPOTENCY_KEY_REUSE_CONFLICT");
+      return existing.promise;
+    }
+
+    const promise=this.executeIncomingFresh(request,cachePath,bindingPath,requestDigest);
+    FlopAgent.incomingInflight.set(cacheBase,{requestDigest,promise});
+    try {
+      return await promise;
+    } finally {
+      if(FlopAgent.incomingInflight.get(cacheBase)?.promise===promise) FlopAgent.incomingInflight.delete(cacheBase);
+    }
+  }
+
+  private async executeIncomingFresh(
+    request:WorkRequest,
+    cachePath:string,
+    bindingPath:string,
+    requestDigest:string,
+  ):Promise<EvidenceBundle>{
     const self = advertise(this.config);
     const { decision } = await routeWithSessionRouter(request, [{
       agentId: self.agentId,
