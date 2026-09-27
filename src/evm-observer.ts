@@ -2,6 +2,7 @@ import { testnetObservationDigest, type TestnetFinality, type TestnetRailObserva
 
 type RpcTx={hash:string;from:string;to:string|null;value:string;blockNumber:string|null};
 type RpcReceipt={transactionHash:string;status:string;blockNumber:string;blockHash:string};
+type RpcBlock={number:string}|null;
 
 const hex=(v:string)=>BigInt(v);
 
@@ -34,7 +35,27 @@ function eqAddr(actual?:string|null,expected?:string|null){
   return actual.toLowerCase()===expected.toLowerCase();
 }
 
-async function one(req:EvmSettlementObservationRequest,kind:"LOCKED"|"SETTLED",latest:number):Promise<TestnetRailObservation>{
+function blockNumber(block:RpcBlock):number|null{
+  if(!block) return null;
+  const n=Number(hex(block.number));
+  return Number.isSafeInteger(n)&&n>=0?n:null;
+}
+
+async function finalityHeads(url:string):Promise<{safe:number|null;finalized:number|null}>{
+  const read=async(tag:"safe"|"finalized")=>{
+    try{return blockNumber(await rpc<RpcBlock>(url,"eth_getBlockByNumber",[tag,false]));}
+    catch{return null;}
+  };
+  const [safe,finalized]=await Promise.all([read("safe"),read("finalized")]);
+  return {safe,finalized};
+}
+
+async function one(
+  req:EvmSettlementObservationRequest,
+  kind:"LOCKED"|"SETTLED",
+  latest:number,
+  heads:{safe:number|null;finalized:number|null},
+):Promise<TestnetRailObservation>{
   const part=kind==="LOCKED"?req.lock:req.settlement;
   const [tx,receipt]=await Promise.all([
     rpc<RpcTx>(req.rpcUrl,"eth_getTransactionByHash",[part.txHash]),
@@ -51,7 +72,10 @@ async function one(req:EvmSettlementObservationRequest,kind:"LOCKED"|"SETTLED",l
   const block=Number(hex(receipt.blockNumber));
   if(!Number.isSafeInteger(block)||block<0||!Number.isSafeInteger(latest)||latest<block) throw new Error(`${kind}_BLOCK_HEIGHT_INVALID`);
   const confirmations=latest-block+1;
-  const finality:TestnetFinality=confirmations>=64?"FINALIZED":confirmations>=12?"SAFE":"CONFIRMED";
+  const finality:TestnetFinality =
+    heads.finalized!==null && block<=heads.finalized ? "FINALIZED" :
+    heads.safe!==null && block<=heads.safe ? "SAFE" :
+    "CONFIRMED";
   const body={
     schema:"flop.testnet-rail-observation/v1" as const,
     mode:"TESTNET" as const,
@@ -81,8 +105,9 @@ export async function observeEvmTestnetSettlement(req:EvmSettlementObservationRe
   if(BigInt(actualChain).toString()!==BigInt(req.chainId).toString()) throw new Error("CHAIN_ID_MISMATCH");
   const latest=Number(hex(await rpc<string>(req.rpcUrl,"eth_blockNumber",[])));
   if(!Number.isSafeInteger(latest)||latest<0) throw new Error("LATEST_BLOCK_INVALID");
-  const lock=await one(req,"LOCKED",latest);
-  const settled=await one(req,"SETTLED",latest);
+  const heads=await finalityHeads(req.rpcUrl);
+  const lock=await one(req,"LOCKED",latest,heads);
+  const settled=await one(req,"SETTLED",latest,heads);
   if(lock.lockRef!==settled.lockRef) throw new Error("LOCK_REF_MISMATCH");
   return [lock,settled];
 }

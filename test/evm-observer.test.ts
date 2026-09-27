@@ -15,7 +15,12 @@ function installRpc(overrides: Record<string,unknown>={}) {
     let result:unknown;
     if(body.method==="eth_chainId") result="0xaa36a7";
     else if(body.method==="eth_blockNumber") result="0x80";
-    else if(body.method==="eth_getTransactionByHash"){
+    else if(body.method==="eth_getBlockByNumber"){
+      const tag=body.params[0];
+      if(tag==="safe") result={number:"0x70"};
+      else if(tag==="finalized") result={number:"0x6f"};
+      else result=null;
+    } else if(body.method==="eth_getTransactionByHash"){
       const h=body.params[0];
       const block=h===lockHash?"0x64":"0x65";
       result={hash:h,from,to,value:"0x64",blockNumber:block,...(overrides[`tx:${h}`] as object??{})};
@@ -48,6 +53,7 @@ test("EVM observer emits canonical observations accepted by settlement verifier"
     const observations=await observeEvmTestnetSettlement(request());
     assert.equal(observations.length,2);
     assert.ok(observations.every(x=>x.observerId==="test:rpc-observer"));
+    assert.ok(observations.every(x=>x.finality==="FINALIZED"));
     const verified=verifyTestnetSettlement(observations,{reservationId:"r1",asset:"ETH",lockedAmount:"100",settledAmount:"60",minConfirmations:12,allowedNetworks:["sepolia"]});
     assert.equal(verified.status,"VERIFIED");
   }finally{restore();}
@@ -74,4 +80,33 @@ test("EVM observer fails closed for non-native asset semantics",async()=>{
     delete input.assetKind;
     await assert.rejects(observeEvmTestnetSettlement(input),/EVM_ASSET_KIND_UNSUPPORTED/);
   }finally{restore();}
+});
+
+test("EVM observer does not infer SAFE or FINALIZED when RPC finality heads are unavailable",async()=>{
+  const original=globalThis.fetch;
+  globalThis.fetch=async (_input:any,init:any)=>{
+    const body=JSON.parse(String(init.body));
+    if(body.method==="eth_getBlockByNumber"){
+      return new Response(JSON.stringify({jsonrpc:"2.0",id:1,error:{code:-32602,message:"unsupported tag"}}),{status:200,headers:{"content-type":"application/json"}});
+    }
+    let result:unknown;
+    if(body.method==="eth_chainId") result="0xaa36a7";
+    else if(body.method==="eth_blockNumber") result="0x80";
+    else if(body.method==="eth_getTransactionByHash"){
+      const h=body.params[0];
+      const block=h===lockHash?"0x64":"0x65";
+      result={hash:h,from,to,value:"0x64",blockNumber:block};
+    } else if(body.method==="eth_getTransactionReceipt"){
+      const h=body.params[0];
+      const block=h===lockHash?"0x64":"0x65";
+      result={transactionHash:h,status:"0x1",blockNumber:block,blockHash:h===lockHash?"0xblock1":"0xblock2"};
+    } else throw new Error("unexpected rpc method");
+    return new Response(JSON.stringify({jsonrpc:"2.0",id:1,result}),{status:200,headers:{"content-type":"application/json"}});
+  };
+  try{
+    const observations=await observeEvmTestnetSettlement(request());
+    assert.ok(observations.every(x=>x.finality==="CONFIRMED"));
+    const verified=verifyTestnetSettlement(observations,{reservationId:"r1",asset:"ETH",lockedAmount:"100",settledAmount:"60",minConfirmations:12,allowedNetworks:["sepolia"]});
+    assert.equal(verified.status,"UNVERIFIED");
+  }finally{globalThis.fetch=original;}
 });
