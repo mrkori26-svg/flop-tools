@@ -10,13 +10,13 @@ import {
 } from "@flop-tools/session-router";
 import type { Candidate, RouteDecision, WorkRequest } from "./types.js";
 
-const asMiner = (candidate: Candidate, capability: string): MinerCandidate => ({
+const asMiner = (candidate: Candidate): MinerCandidate => ({
   id: candidate.agentId,
   identity: candidate.agentId.startsWith("did:") ? { did: candidate.agentId } : { account: candidate.agentId },
   enabled: true,
   endpoint: candidate.endpoint ? { url: candidate.endpoint, protocol: "flop-agent-http/v1" } : undefined,
-  capabilities: [{
-    modelId: capability,
+  capabilities: candidate.capabilities.map(modelId => ({
+    modelId,
     assurance: "SOFT",
     observedAt: candidate.observedAt,
     provenance: {
@@ -25,7 +25,7 @@ const asMiner = (candidate: Candidate, capability: string): MinerCandidate => ({
       coverage: "PARTIAL",
       observedAt: candidate.observedAt,
     },
-  }],
+  })),
   telemetry: {
     availability: 1,
     successEwma: 0.5,
@@ -42,7 +42,7 @@ export async function routeWithSessionRouter(
   const repo = new RouterRepository(join(stateDir, "router.db"));
   try {
     const router = new SessionRouter(
-      new StaticCandidateProvider(candidates.map(x => asMiner(x, request.capability))),
+      new StaticCandidateProvider(candidates.map(asMiner)),
       repo,
     );
     const sessionDecision = await router.route({
@@ -87,7 +87,7 @@ export async function executeRoutedWork<T>(
   const repo = new RouterRepository(join(stateDir, "router.db"));
   try {
     const router = new SessionRouter(
-      new StaticCandidateProvider(candidates.map(x => asMiner(x, request.capability))),
+      new StaticCandidateProvider(candidates.map(asMiner)),
       repo,
       { ...DEFAULT_CONFIG, preflightTimeoutMs: timeoutMs },
     );

@@ -1,7 +1,7 @@
 import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-export type WorkOutcome = "ACCEPTED"|"COMPLETED"|"VALIDATED"|"FAILED"|"EXPIRED"|"REJECTED";
+export type WorkOutcome = "SELECTED"|"ACCEPTED"|"COMPLETED"|"VALIDATED"|"FAILED"|"EXPIRED"|"REJECTED";
 export type OperationalRecord = {
   schema:"flop.operational-memory/v1";
   at:string;

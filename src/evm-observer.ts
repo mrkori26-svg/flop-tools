@@ -24,6 +24,7 @@ export type EvmSettlementObservationRequest={
   asset:string;
   lock:{txHash:string;lockRef:string;amount:string;to?:string;from?:string};
   settlement:{txHash:string;lockRef:string;amount:string;to?:string;from?:string};
+  observerId?:string;
 };
 
 function eqAddr(a?:string|null,b?:string|null){return !a||!b||a.toLowerCase()===b.toLowerCase();}
@@ -44,7 +45,8 @@ async function one(req:EvmSettlementObservationRequest,kind:"LOCKED"|"SETTLED",l
   return {
     schema:"flop.testnet-rail-observation/v1",mode:"TESTNET",railId:req.railId,network:req.network,chainId:req.chainId,
     reservationId:req.reservationId,state:kind,lockRef:part.lockRef,txRef:part.txHash,asset:req.asset,amount:BigInt(part.amount).toString(),
-    blockRef:receipt.blockHash,confirmations,finality,observedAt:new Date().toISOString(),evidenceDigest:digest(raw),externalObserver:true
+    blockRef:receipt.blockHash,confirmations,finality,observedAt:new Date().toISOString(),evidenceDigest:digest(raw),externalObserver:true,
+    observerId:req.observerId??"flop-tools:evm-rpc-observer/v1"
   };
 }
 

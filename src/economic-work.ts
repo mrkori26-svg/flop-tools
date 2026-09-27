@@ -17,6 +17,7 @@ export type EconomicWorkConfig={
   minReward?:number;
   allowedAssets?:string[];
   allowUnfunded?:boolean;
+  requireDeclaredFunding?:boolean;
 };
 
 export type WorkPlan={
@@ -61,6 +62,7 @@ export type ExternalExecutionEvidence={
   expected:{
     reservationId:string;
     asset:string;
+    lockedAmount:string;
     settledAmount:string;
     minConfirmations:number;
     allowedNetworks?:string[];
@@ -105,13 +107,14 @@ export function classifyOffer(o:MarketOffer):{worker:WorkerKind;capability:strin
 export function rankPlans(
   offers:MarketOffer[],
   reputations:Map<string,CounterpartyReputation>,
-  config:Pick<EconomicWorkConfig,"minReward"|"allowedAssets"|"allowUnfunded">={}
+  config:Pick<EconomicWorkConfig,"minReward"|"allowedAssets"|"allowUnfunded"|"requireDeclaredFunding">={}
 ):WorkPlan[]{
   const min=config.minReward??0; const assets=config.allowedAssets??[];
   const plans:WorkPlan[]=[];
   for(const offer of offers){
     if(unsupportedOfferReason(offer)) continue;
     if(!offer.funded && !config.allowUnfunded) continue;
+    if(config.requireDeclaredFunding && offer.fundingStatus!=="DECLARED_FUNDED") continue;
     if(offer.reward){
       if(Number(offer.reward.amount)<min) continue;
       if(assets.length && !assets.includes(offer.reward.asset)) continue;
@@ -119,7 +122,7 @@ export function rankPlans(
     const c=classifyOffer(offer); const rep=offer.payer?reputations.get(offer.payer):undefined;
     let priority=(offer.funded?100:0)+(offer.reward?Math.min(50,Math.log10(1+Number(offer.reward.amount))*10):0)+(rep?rep.score*20:10);
     if(c.worker==="conformance"||c.worker==="execution-proof") priority+=12;
-    plans.push({schema:"flop.economic-work-plan/v1",offer,worker:c.worker,capability:c.capability,funded:offer.funded,reward:offer.reward,counterpartyReputation:rep,priority,rationale:[...c.rationale,offer.funded?"funded":"unfunded",rep?`reputation=${rep.score.toFixed(3)}`:"reputation=unknown"]});
+    plans.push({schema:"flop.economic-work-plan/v1",offer,worker:c.worker,capability:c.capability,funded:offer.funded,reward:offer.reward,counterpartyReputation:rep,priority,rationale:[...c.rationale,offer.funded?"funded":"unfunded",`funding=${offer.fundingStatus.toLowerCase()}`,rep?`reputation=${rep.score.toFixed(3)}`:"reputation=unknown"]});
   }
   return plans.sort((a,b)=>b.priority-a.priority||a.offer.offerId.localeCompare(b.offer.offerId));
 }
@@ -146,7 +149,7 @@ export class EconomicWorkLayer{
   async executePlan(plan:WorkPlan,input?:unknown):Promise<PreparedEconomicExecution>{
     const workId=`market:${plan.offer.source}:${plan.offer.offerId}`;
     const started=Date.now(); const counterparty=plan.offer.payer??"unknown";
-    await this.memory.append({schema:"flop.operational-memory/v1",at:new Date().toISOString(),counterparty,capability:plan.capability,workId,outcome:"ACCEPTED",reward:plan.reward});
+    await this.memory.append({schema:"flop.operational-memory/v1",at:new Date().toISOString(),counterparty,capability:plan.capability,workId,outcome:"SELECTED",reward:plan.reward});
     const workerInput=input??(plan.worker==="inference"?{prompt:plan.offer.spec??plan.offer.context??plan.offer.offerId}:{text:plan.offer.spec??plan.offer.context??JSON.stringify(plan.offer)});
     const execution=await executeWorker(plan.worker,workerInput as any);
     await this.memory.append({schema:"flop.operational-memory/v1",at:new Date().toISOString(),counterparty,capability:plan.capability,workId,outcome:execution.status==="COMPLETED"?"COMPLETED":"FAILED",latencyMs:Date.now()-started,evidenceRef:execution.outputDigest,reward:plan.reward,failureMode:execution.error});
@@ -160,8 +163,13 @@ export class EconomicWorkLayer{
   async finalize(prepared:PreparedEconomicExecution,evidence?:ExternalExecutionEvidence):Promise<EconomicWorkReceipt>{
     let payment:EconomicWorkReceipt["payment"]={status:prepared.paymentRequirement?"UNVERIFIED":"NOT_REQUIRED"};
     if(prepared.paymentRequirement&&evidence){
-      const verification=verifyTestnetSettlement(evidence.observations,evidence.expected);
-      payment={status:verification.status==="VERIFIED"?"VERIFIED_TESTNET":"UNVERIFIED",verification};
+      const bindingMatches =
+        evidence.expected.asset===prepared.paymentRequirement.asset &&
+        evidence.expected.settledAmount===prepared.paymentRequirement.amount;
+      if(bindingMatches){
+        const verification=verifyTestnetSettlement(evidence.observations,evidence.expected);
+        payment={status:verification.status==="VERIFIED"?"VERIFIED_TESTNET":"UNVERIFIED",verification};
+      }
     }
     const ok=prepared.execution.status==="COMPLETED"&&(!prepared.paymentRequirement||payment.status==="VERIFIED_TESTNET");
     const body={schema:"flop.economic-work-receipt/v1" as const,workId:prepared.workId,preparedDigest:prepared.digest,executionDigest:prepared.execution.outputDigest??digest(prepared.execution),payment,completedAt:new Date().toISOString(),status:(ok?"COMPLETED":"FAILED") as "COMPLETED"|"FAILED"};
