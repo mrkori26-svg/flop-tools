@@ -42,6 +42,7 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@flop-tools/conformance-lab": "file:../flop-conformance-lab",
+    "@flop-tools/economic-runtime": "file:../flop-economic-runtime",
     "@flop-tools/session-router": "file:../flop-session-router",
     "@flop-tools/work-execution-receipt": "file:../flop-work-execution-receipt",
     "@modelcontextprotocol/server": "^2.1.0",
