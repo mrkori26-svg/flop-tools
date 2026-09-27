@@ -40,7 +40,7 @@ function publicKeyFromDid(did: string) {
   return createPublicKey({ key: Buffer.concat([prefix, raw]), format: "der", type: "spki" });
 }
 
-function verifyRoomMessage(room: string, message: TechnocoreMessage): boolean {
+export function verifyRoomMessage(room: string, message: TechnocoreMessage): boolean {
   if (typeof message.from !== "string" || typeof message.text !== "string" ||
       typeof message.sig !== "string" ||
       (typeof message.nonce !== "string" && typeof message.nonce !== "number")) return false;

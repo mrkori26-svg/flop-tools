@@ -1,11 +1,15 @@
 #!/usr/bin/env node
 import { createServer } from "node:http";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { FlopAgent } from "./agent.js";
 import { diagnoseAgent } from "./diagnostics.js";
 import { serveMcp } from "./mcp.js";
 import { loadConfig, newWorkId, validateAgentConfig, validateWorkRequest } from "./core.js";
+import { EconomicWorkLayer, readPrepared } from "./economic-work.js";
+import { capabilityRegistry } from "./capabilities.js";
+import { buildReputation } from "./reputation.js";
+import { discoverObservedCapabilities } from "./ecosystem-capabilities.js";
 import type { AgentConfig, WorkRequest } from "./types.js";
 
 const args = process.argv.slice(2);
@@ -158,6 +162,68 @@ async function doctor() {
   if (report.status === "FAIL") process.exitCode = 1;
 }
 
+async function economicLayer() {
+  const stateDir = resolve(value("--state", ".flop/economic-work")!);
+  return new EconomicWorkLayer({
+    stateDir,
+    marketFeed: value("--market-feed", "https://flop-market.pages.dev/open.json"),
+    minReward: Number(value("--min-reward", "0")),
+    allowedAssets: (value("--assets", "") ?? "").split(",").map(x=>x.trim()).filter(Boolean),
+    allowUnfunded: args.includes("--allow-unfunded"),
+  });
+}
+
+async function economicScan() {
+  const layer = await economicLayer();
+  console.log(JSON.stringify(await layer.plans(), null, 2));
+}
+
+async function economicRun() {
+  const layer = await economicLayer();
+  const plans = await layer.plans();
+  const offer = value("--offer");
+  const selected = offer ? plans.find(x=>x.offer.offerId===offer) : plans[0];
+  if (!selected) throw new Error("NO_ELIGIBLE_MARKET_WORK");
+  console.log(JSON.stringify(await layer.executePlan(selected), null, 2));
+}
+
+async function economicCapabilities() {
+  let external:any[]=[];
+  try { external=await new FlopAgent(await loadConfig(configPath)).candidates(); } catch {}
+  console.log(JSON.stringify(capabilityRegistry(external), null, 2));
+}
+
+async function economicReputation() {
+  const layer = await economicLayer();
+  const records = await layer.memory.read();
+  const subject = value("--subject");
+  if (subject) return console.log(JSON.stringify(buildReputation(subject,records), null, 2));
+  const ids=[...new Set(records.map(x=>x.counterparty))];
+  console.log(JSON.stringify(ids.map(id=>buildReputation(id,records)).sort((a,b)=>b.score-a.score), null, 2));
+}
+
+async function economicMemory() {
+  const layer = await economicLayer();
+  console.log(JSON.stringify(await layer.memory.longitudinal(), null, 2));
+}
+
+async function economicFinalize() {
+  const preparedPath=value("--prepared");
+  if(!preparedPath) throw new Error("PREPARED_PATH_REQUIRED");
+  const layer=await economicLayer();
+  const prepared=await readPrepared(resolve(preparedPath));
+  const evidencePath=value("--evidence");
+  const evidence=evidencePath ? JSON.parse(await readFile(resolve(evidencePath),"utf8")) : undefined;
+  console.log(JSON.stringify(await layer.finalize(prepared,evidence),null,2));
+}
+
+async function economicDiscoverCapabilities() {
+  const registry=await discoverObservedCapabilities(value("--room","blockrewards")!,value("--technocore-url","https://technocore.chat")!);
+  const stateDir=resolve(value("--state",".flop/economic-work")!); await mkdir(stateDir,{recursive:true});
+  await writeFile(resolve(stateDir,"observed-capabilities.json"),JSON.stringify(registry,null,2)+"\n","utf8");
+  console.log(JSON.stringify(registry,null,2));
+}
+
 async function main() {
   if (cmd === "init") return init();
   if (cmd === "publish") return publish();
@@ -166,7 +232,14 @@ async function main() {
   if (cmd === "demo") return demo();
   if (cmd === "doctor") return doctor();
   if (cmd === "mcp") return serveMcp(configPath);
-  console.log("flop-agent <init|publish|run|serve|demo|doctor|mcp> [--config flop-agent.json]");
+  if (cmd === "economic-scan") return economicScan();
+  if (cmd === "economic-run") return economicRun();
+  if (cmd === "economic-capabilities") return economicCapabilities();
+  if (cmd === "economic-reputation") return economicReputation();
+  if (cmd === "economic-memory") return economicMemory();
+  if (cmd === "economic-finalize") return economicFinalize();
+  if (cmd === "economic-discover-capabilities") return economicDiscoverCapabilities();
+  console.log("flop-agent <init|publish|run|serve|demo|doctor|mcp|economic-scan|economic-run|economic-capabilities|economic-reputation|economic-memory|economic-finalize|economic-discover-capabilities> [--config flop-agent.json]");
   console.log("init options: --discovery local|technocore --endpoint <https-url> --room <room> --signer-command <path> --signer-args '[\"script.py\"]'");
   console.log("runtime options: --runtime shell|http --runtime-command <path> --runtime-args '[\"arg\"]' --runtime-url <url> --timeout-ms <ms> --max-attempts <n>");
 }

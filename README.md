@@ -58,6 +58,18 @@ MCP tools: `flop_agent_run`, `flop_agent_publish`, `flop_agent_candidates`, and 
 
 Every completed request persists a receipt, evidence bundle, latest snapshot and append-only observation record under the configured state directory. Budgeted requests currently fail closed until comparable quote/pricing evidence is available.
 
+## Economic work
+
+The Economic Work Layer adds funded-market discovery, deliverability filtering, capability matching, evidence-derived counterparty reputation, 7/30/90-day operational memory, six reusable workers and externally verified settlement. A reward advertisement is never treated as payment evidence: funded work remains payment-pending until the external rail verifies.
+
+```bash
+node dist/src/cli.js economic-scan --state ../runtime/economic-work
+node dist/src/cli.js economic-discover-capabilities --state ../runtime/economic-work
+node dist/src/cli.js economic-memory --state ../runtime/economic-work
+```
+
+See `docs/ECONOMIC_WORK_LAYER.md` for workers, trust boundaries, EVM observation and finalization.
+
 For signed ecosystem discovery, `init --discovery technocore` requires both a public HTTPS `--endpoint` and `--signer-command`; invalid setup fails before writing config. Run `flop-agent doctor` before `publish`. The signer remains outside the Node process and discovered advertisements are signature-verified.
 
 See `docs/ARCHITECTURE.md`, `docs/TECHNOCORE.md`, `docs/MCP.md`, `docs/WINDOWS_OPERATIONS.md` and `ADOPTION.md`.

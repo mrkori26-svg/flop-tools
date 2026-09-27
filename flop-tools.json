@@ -10,6 +10,8 @@
   },
   "components": {
     "execution_receipt": "https://github.com/retardio73-boop/flop-work-execution-receipt",
+    "economic_runtime": "https://github.com/retardio73-boop/flop-economic-runtime",
+    "economic_work_layer": "@flop-tools/agent#economic-work",
     "reference_application": "https://github.com/retardio73-boop/flop-empires"
   },
   "status": "alpha-community",
