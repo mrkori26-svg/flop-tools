@@ -4,6 +4,17 @@ import type { AgentConfig, ExecutionResult, WorkRequest } from "./types.js";
 
 const execFileAsync = promisify(execFile);
 
+class RuntimeHttpError extends Error {
+  constructor(readonly status:number){ super(`HTTP_RUNTIME_${status}`); }
+}
+
+function retryableRuntimeError(error:unknown):boolean {
+  if(error instanceof RuntimeHttpError){
+    return error.status===408 || error.status===425 || error.status===429 || error.status>=500;
+  }
+  return true;
+}
+
 async function runShell(config: AgentConfig, request: WorkRequest): Promise<unknown> {
   if (!config.runtime.command) throw new Error("SHELL_COMMAND_MISSING");
   const args = [...(config.runtime.args ?? []), JSON.stringify(request.input)];
@@ -26,7 +37,7 @@ async function runHttp(config: AgentConfig, request: WorkRequest): Promise<unkno
       body: JSON.stringify(request),
       signal: ctl.signal,
     });
-    if (!response.ok) throw new Error(`HTTP_RUNTIME_${response.status}`);
+    if (!response.ok) throw new RuntimeHttpError(response.status);
     const text = await response.text();
     try { return JSON.parse(text); } catch { return text; }
   } finally {
@@ -46,7 +57,11 @@ export async function executeWork(config: AgentConfig, request: WorkRequest): Pr
       return { status: "completed", output, startedAt, finishedAt: new Date().toISOString(), attempts: attempt };
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error);
-      if (attempt < maxAttempts) await new Promise(resolve => setTimeout(resolve, Math.min(250 * attempt, 1000)));
+      const retryable = config.runtime.kind !== "http" || retryableRuntimeError(error);
+      if (!retryable || attempt === maxAttempts) {
+        return { status: "failed", error: lastError, startedAt, finishedAt: new Date().toISOString(), attempts: attempt };
+      }
+      await new Promise(resolve => setTimeout(resolve, Math.min(250 * attempt, 1000)));
     }
   }
   return { status: "failed", error: lastError, startedAt, finishedAt: new Date().toISOString(), attempts: maxAttempts };
