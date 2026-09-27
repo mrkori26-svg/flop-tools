@@ -8,6 +8,7 @@ export type MarketOffer = {
   payer?: string;
   reward?: { amount: string; asset: string };
   funded: boolean;
+  fundingStatus: "DECLARED_FUNDED" | "ADVERTISED" | "UNFUNDED";
   spec?: string;
   context?: string;
   expiresAt?: string;
@@ -55,6 +56,7 @@ export function normalizeMarketOffer(item: Record<string,unknown>, source: strin
   const asset = asString(rewardObj.asset) ?? asString(item.asset) ?? asString(item.currency);
   const fundedFlag = item.funded === true || item.status === "funded" || item.status === "open-funded";
   const numericFunded = amount !== undefined && Number(amount) > 0;
+  const fundingStatus: MarketOffer["fundingStatus"] = fundedFlag ? "DECLARED_FUNDED" : numericFunded ? "ADVERTISED" : "UNFUNDED";
   const expiresAt = asString(item.expiresAt) ?? asString(item.expires) ?? asString(item.deadline);
   return {
     schema:"flop.market-offer/v1",
@@ -64,6 +66,7 @@ export function normalizeMarketOffer(item: Record<string,unknown>, source: strin
     payer: asString(item.payer) ?? asString(item.from) ?? asString(item.did),
     reward: amount && asset ? {amount,asset} : undefined,
     funded: fundedFlag || numericFunded,
+    fundingStatus,
     spec: asString(item.spec) ?? asString(job.spec) ?? asString(item.task),
     context: asString(item.context) ?? asString(job.context) ?? asString(item.description),
     expiresAt,

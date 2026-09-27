@@ -149,3 +149,39 @@ test("budgeted work fails closed until comparable pricing exists", async () => {
     /BUDGET_ENFORCEMENT_UNAVAILABLE/,
   );
 });
+
+
+test("idempotency key reuse with different request content fails closed", async () => {
+  const root = await mkdtemp(join(tmpdir(), "flop-agent-idem-conflict-"));
+  try {
+    const config: AgentConfig = {
+      id:"agent-a", name:"Agent A", capabilities:["research"],
+      registryPath:join(root,"registry.json"), stateDir:join(root,"state"),
+      runtime:{kind:"shell",command:process.execPath,args:["-e","const x=JSON.parse(process.argv[1]); console.log(JSON.stringify({ok:true,input:x}))"],timeoutMs:5000,maxAttempts:1},
+    };
+    const agent=new FlopAgent(config);
+    await agent.executeIncoming({id:"work-1",capability:"research",input:{q:"a"},idempotencyKey:"same"});
+    await assert.rejects(
+      agent.executeIncoming({id:"work-1",capability:"research",input:{q:"b"},idempotencyKey:"same"}),
+      /IDEMPOTENCY_KEY_REUSE_CONFLICT/,
+    );
+  } finally {
+    await rm(root,{recursive:true,force:true});
+  }
+});
+
+test("Session Router cannot select a candidate that did not advertise the requested capability", async () => {
+  const root=await mkdtemp(join(tmpdir(),"flop-agent-capability-"));
+  try {
+    await assert.rejects(
+      executeRoutedWork(
+        {id:"cap-work",capability:"research",input:{}},
+        [{agentId:"agent-code",capabilities:["code"],runtimeKind:"http" as const,endpoint:"http://invalid/work",observedAt:new Date().toISOString()}],
+        join(root,"state"),1,1000,async()=>({ok:true}),
+      ),
+      /NO_ELIGIBLE_AGENT/,
+    );
+  } finally {
+    await rm(root,{recursive:true,force:true});
+  }
+});

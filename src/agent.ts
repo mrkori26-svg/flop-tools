@@ -86,10 +86,25 @@ export class FlopAgent {
   async executeIncoming(request: WorkRequest): Promise<EvidenceBundle> {
     if (request.budget) throw new Error("BUDGET_ENFORCEMENT_UNAVAILABLE");
     const idempotencyKey = request.idempotencyKey ?? request.id;
-    const cachePath = join(this.config.stateDir, "idempotency", `${digest(idempotencyKey).slice(7)}.json`);
+    const requestDigest = digest({ id:request.id, capability:request.capability, input:request.input, budget:request.budget });
+    const cacheBase = join(this.config.stateDir, "idempotency", digest(idempotencyKey).slice(7));
+    const cachePath = cacheBase + ".json";
+    const bindingPath = cacheBase + ".binding.json";
     try {
-      return JSON.parse(await readFile(cachePath, "utf8")) as EvidenceBundle;
-    } catch {}
+      const cached = JSON.parse(await readFile(cachePath, "utf8")) as EvidenceBundle;
+      try {
+        const binding = JSON.parse(await readFile(bindingPath, "utf8")) as { schema?:string; requestDigest?:string };
+        if (binding.schema === "flop.idempotency-binding/v1" && binding.requestDigest !== requestDigest) {
+          throw new Error("IDEMPOTENCY_KEY_REUSE_CONFLICT");
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message === "IDEMPOTENCY_KEY_REUSE_CONFLICT") throw error;
+        if (cached.receipt?.workId !== request.id) throw new Error("IDEMPOTENCY_KEY_REUSE_CONFLICT");
+      }
+      return cached;
+    } catch (error) {
+      if (error instanceof Error && error.message === "IDEMPOTENCY_KEY_REUSE_CONFLICT") throw error;
+    }
     const self = advertise(this.config);
     const { decision } = await routeWithSessionRouter(request, [{
       agentId: self.agentId,
@@ -103,6 +118,7 @@ export class FlopAgent {
     const selfChecked = buildEvidence(receipt);
     const bundle = { ...selfChecked, independentVerification: verifyExternalProfile("flop-agent", selfChecked) };
     await publishArtifacts(this.config.stateDir, receipt, bundle);
+    await saveJson(bindingPath, { schema:"flop.idempotency-binding/v1", requestDigest });
     await saveJson(cachePath, bundle);
     return bundle;
   }

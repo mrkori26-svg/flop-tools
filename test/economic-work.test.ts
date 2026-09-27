@@ -48,3 +48,40 @@ test("economic execution stays payment-pending without external settlement evide
   assert.equal(receipt.status,"FAILED");
   assert.equal(receipt.payment.status,"UNVERIFIED");
 });
+
+
+test("advertised reward is not promoted to verified funding",()=>{
+  const offer=normalizeMarketOffer({id:"adv-1",proto:"a2a",amount:"100",asset:"FLOP",task:"run public CI conformance fixture"},"test",0);
+  assert.equal(offer.funded,true);
+  assert.equal(offer.fundingStatus,"ADVERTISED");
+  assert.equal(rankPlans([offer],new Map(),{allowUnfunded:false}).length,1);
+  assert.equal(rankPlans([offer],new Map(),{allowUnfunded:false,requireDeclaredFunding:true}).length,0);
+});
+
+test("local selection is not recorded as external acceptance",async()=>{
+  const stateDir=await mkdtemp(join(tmpdir(),"flop-economic-selection-"));
+  const layer=new EconomicWorkLayer({stateDir,allowUnfunded:true});
+  const offer=normalizeMarketOffer({id:"sel-1",proto:"a2a",amount:"1",asset:"FLOP",funded:true,task:"produce execution receipt",from:"did:payer"},"test",0);
+  const plan=rankPlans([offer],new Map(),{allowUnfunded:true})[0]!;
+  await layer.executePlan(plan,{workId:"w1",executor:"agent",result:{ok:true}});
+  const records=await layer.memory.read();
+  assert.equal(records[0]?.outcome,"SELECTED");
+  assert.equal(records.some(x=>x.outcome==="ACCEPTED"),false);
+});
+
+test("payment evidence must bind asset and amount to the prepared requirement",async()=>{
+  const stateDir=await mkdtemp(join(tmpdir(),"flop-economic-binding-"));
+  const layer=new EconomicWorkLayer({stateDir,allowUnfunded:true});
+  const offer=normalizeMarketOffer({id:"bind-1",proto:"a2a",amount:"100",asset:"FLOP",funded:true,task:"produce execution receipt",from:"did:payer"},"test",0);
+  const plan=rankPlans([offer],new Map(),{allowUnfunded:true})[0]!;
+  const prepared=await layer.executePlan(plan,{workId:"w1",executor:"agent",result:{ok:true}});
+  const receipt=await layer.finalize(prepared,{
+    schema:"flop.external-execution-evidence/v1",
+    mode:"TESTNET",
+    observations:[],
+    expected:{reservationId:"r1",asset:"USDC",lockedAmount:"100",settledAmount:"100",minConfirmations:1},
+    observedAt:new Date().toISOString(),
+  });
+  assert.equal(receipt.payment.status,"UNVERIFIED");
+  assert.equal(receipt.status,"FAILED");
+});
