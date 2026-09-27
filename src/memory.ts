@@ -1,4 +1,4 @@
-import { appendFile, mkdir, readFile } from "node:fs/promises";
+import { appendFile, mkdir, open, readFile, stat, unlink } from "node:fs/promises";
 import { dirname } from "node:path";
 
 export type WorkOutcome = "SELECTED"|"ACCEPTED"|"COMPLETED"|"VALIDATED"|"FAILED"|"EXPIRED"|"REJECTED";
@@ -17,6 +17,38 @@ export type OperationalRecord = {
 };
 
 const OUTCOMES=new Set<WorkOutcome>(["SELECTED","ACCEPTED","COMPLETED","VALIDATED","FAILED","EXPIRED","REJECTED"]);
+
+const LOCK_WAIT_MS=10_000;
+const LOCK_STALE_MS=300_000;
+const sleep=(ms:number)=>new Promise(resolve=>setTimeout(resolve,ms));
+
+async function withFileLock<T>(path:string,fn:()=>Promise<T>):Promise<T>{
+  const started=Date.now();
+  while(true){
+    try{
+      const handle=await open(path,"wx");
+      try{
+        await handle.writeFile(JSON.stringify({pid:process.pid,createdAt:new Date().toISOString()}));
+        return await fn();
+      }finally{
+        await handle.close().catch(()=>{});
+        await unlink(path).catch(()=>{});
+      }
+    }catch(error){
+      const code=(error as NodeJS.ErrnoException)?.code;
+      if(code!=="EEXIST") throw error;
+      try{
+        const info=await stat(path);
+        if(Date.now()-info.mtimeMs>LOCK_STALE_MS){ await unlink(path).catch(()=>{}); continue; }
+      }catch(statError){
+        if((statError as NodeJS.ErrnoException)?.code==="ENOENT") continue;
+        throw statError;
+      }
+      if(Date.now()-started>=LOCK_WAIT_MS) throw new Error("OPERATIONAL_MEMORY_LOCK_TIMEOUT");
+      await sleep(20);
+    }
+  }
+}
 
 function validateRecord(value:unknown,line:number):OperationalRecord{
   if(!value||typeof value!=="object"||Array.isArray(value)) throw new Error(`OPERATIONAL_MEMORY_CORRUPT_LINE_${line}`);
@@ -48,10 +80,12 @@ export class OperationalMemory {
   async append(record: OperationalRecord): Promise<void> {
     validateRecord(record,0);
     await mkdir(dirname(this.path),{recursive:true});
-    const prior=await this.read();
-    const duplicate=prior.some(x=>x.counterparty===record.counterparty&&x.workId===record.workId&&x.outcome===record.outcome&&(x.evidenceRef??"")===(record.evidenceRef??""));
-    if(duplicate) return;
-    await appendFile(this.path, JSON.stringify(record)+"\n","utf8");
+    await withFileLock(this.path+".lock",async()=>{
+      const prior=await this.read();
+      const duplicate=prior.some(x=>x.counterparty===record.counterparty&&x.workId===record.workId&&x.outcome===record.outcome&&(x.evidenceRef??"")===(record.evidenceRef??""));
+      if(duplicate) return;
+      await appendFile(this.path, JSON.stringify(record)+"\n","utf8");
+    });
   }
   async read(): Promise<OperationalRecord[]> {
     let text:string;
