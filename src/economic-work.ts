@@ -165,6 +165,7 @@ export class EconomicWorkLayer{
     if(prepared.paymentRequirement&&evidence){
       const bindingMatches =
         evidence.expected.asset===prepared.paymentRequirement.asset &&
+        evidence.expected.lockedAmount===prepared.paymentRequirement.amount &&
         evidence.expected.settledAmount===prepared.paymentRequirement.amount;
       if(bindingMatches){
         const verification=verifyTestnetSettlement(evidence.observations,evidence.expected);

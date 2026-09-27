@@ -85,3 +85,20 @@ test("payment evidence must bind asset and amount to the prepared requirement",a
   assert.equal(receipt.payment.status,"UNVERIFIED");
   assert.equal(receipt.status,"FAILED");
 });
+
+test("payment evidence must also bind locked amount to the prepared requirement",async()=>{
+  const stateDir=await mkdtemp(join(tmpdir(),"flop-economic-lock-binding-"));
+  const layer=new EconomicWorkLayer({stateDir,allowUnfunded:true});
+  const offer=normalizeMarketOffer({id:"bind-lock",proto:"a2a",amount:"100",asset:"FLOP",funded:true,task:"produce execution receipt",from:"did:payer"},"test",0);
+  const plan=rankPlans([offer],new Map(),{allowUnfunded:true})[0]!;
+  const prepared=await layer.executePlan(plan,{workId:"w1",executor:"agent",result:{ok:true}});
+  const receipt=await layer.finalize(prepared,{
+    schema:"flop.external-execution-evidence/v1",
+    mode:"TESTNET",
+    observations:[],
+    expected:{reservationId:"r1",asset:"FLOP",lockedAmount:"101",settledAmount:"100",minConfirmations:1},
+    observedAt:new Date().toISOString(),
+  });
+  assert.equal(receipt.payment.status,"UNVERIFIED");
+  assert.equal(receipt.status,"FAILED");
+});
