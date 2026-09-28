@@ -83,6 +83,16 @@ test("one FLOP Agent delegates real HTTP work and independently re-verifies the 
     for await (const chunk of req) chunks.push(Buffer.from(chunk));
     try {
       const incoming = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      if (incoming.id === "work-redirect") {
+        res.writeHead(302,{location:"http://127.0.0.1:9/internal"});
+        res.end();
+        return;
+      }
+      if (incoming.id === "work-oversize") {
+        res.writeHead(200,{"content-type":"application/json","content-length":String(9*1024*1024)});
+        res.destroy();
+        return;
+      }
       const bundle = await remote.executeIncoming(incoming);
       if (incoming.id === "work-bad-binding") {
         bundle.receipt.executor = "spoofed-agent";
@@ -126,6 +136,14 @@ test("one FLOP Agent delegates real HTTP work and independently re-verifies the 
         id:"work-bad-binding",capability:"research",input:{task:"spoof"},idempotencyKey:"remote-spoof",
       }),
       /REMOTE_IDENTITY_BINDING_FAILED/,
+    );
+
+    await assert.rejects(
+      client.run({id:"work-redirect",capability:"research",input:{task:"redirect"},idempotencyKey:"remote-redirect"}),
+    );
+    await assert.rejects(
+      client.run({id:"work-oversize",capability:"research",input:{task:"oversize"},idempotencyKey:"remote-oversize"}),
+      /REMOTE_RESPONSE_TOO_LARGE|fetch failed|other side closed/,
     );
   } finally {
     await new Promise<void>(resolve => server.close(()=>resolve()));
