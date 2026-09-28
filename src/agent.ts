@@ -17,6 +17,39 @@ async function upsertAdvertisement(path: string, item: AgentAdvertisement): Prom
   await writeFile(path, JSON.stringify(next, null, 2) + "\n", "utf8");
 }
 
+const MAX_REMOTE_BUNDLE_BYTES = 8 * 1024 * 1024;
+
+async function readRemoteBundle(response: Response): Promise<EvidenceBundle> {
+  const declared = response.headers.get("content-length");
+  if (declared !== null) {
+    const bytes = Number(declared);
+    if (!Number.isFinite(bytes) || bytes < 0 || bytes > MAX_REMOTE_BUNDLE_BYTES) {
+      throw new Error("REMOTE_RESPONSE_TOO_LARGE");
+    }
+  }
+  if (!response.body) throw new Error("REMOTE_RESPONSE_EMPTY");
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+    total += value.byteLength;
+    if (total > MAX_REMOTE_BUNDLE_BYTES) {
+      await reader.cancel("REMOTE_RESPONSE_TOO_LARGE");
+      throw new Error("REMOTE_RESPONSE_TOO_LARGE");
+    }
+    chunks.push(value);
+  }
+  const payload = Buffer.concat(chunks.map(chunk => Buffer.from(chunk)), total).toString("utf8");
+  try {
+    return JSON.parse(payload) as EvidenceBundle;
+  } catch {
+    throw new Error("REMOTE_RESPONSE_INVALID_JSON");
+  }
+}
+
 export const delegatedArtifactName = (requestId: string): string => digest(requestId).slice(7) + ".json";
 
 export class FlopAgent {
@@ -61,9 +94,10 @@ export class FlopAgent {
           headers: { "content-type": "application/json", "idempotency-key": request.idempotencyKey ?? request.id },
           body: JSON.stringify(request),
           signal,
+          redirect: "error",
         });
         if (!response.ok) throw new Error(`REMOTE_AGENT_${response.status}`);
-        const remoteBundle = await response.json() as EvidenceBundle;
+        const remoteBundle = await readRemoteBundle(response);
         if (remoteBundle.receipt?.executor !== candidate.agentId ||
             remoteBundle.receipt?.route?.selectedAgentId !== candidate.agentId) {
           throw new Error("REMOTE_IDENTITY_BINDING_FAILED");
