@@ -176,7 +176,7 @@ export class EconomicWorkLayer{
     const body={schema:"flop.economic-work-receipt/v1" as const,workId:prepared.workId,preparedDigest:prepared.digest,executionDigest:prepared.execution.outputDigest??digest(prepared.execution),payment,completedAt:new Date().toISOString(),status:(ok?"COMPLETED":"FAILED") as "COMPLETED"|"FAILED"};
     const receipt={...body,digest:digest(body)};
     const counterparty=prepared.paymentRequirement?.payer??"unknown";
-    await this.memory.append({schema:"flop.operational-memory/v1",at:new Date().toISOString(),counterparty,capability:prepared.worker,workId:prepared.workId,outcome:ok?"VALIDATED":"FAILED",evidenceRef:receipt.digest,failureMode:ok?undefined:"settlement_or_execution_unverified"});
+    await this.memory.append({schema:"flop.operational-memory/v1",at:new Date().toISOString(),counterparty,capability:prepared.worker,workId:prepared.workId,outcome:ok?"COMPLETED":"FAILED",evidenceRef:receipt.digest,failureMode:ok?undefined:"settlement_or_execution_unverified"});
     await mkdir(join(this.config.stateDir,"economic-work"),{recursive:true});
     await writeFile(join(this.config.stateDir,"economic-work",encodeURIComponent(prepared.offerId)+".receipt.json"),JSON.stringify(receipt,null,2)+"\n","utf8");
     return receipt;

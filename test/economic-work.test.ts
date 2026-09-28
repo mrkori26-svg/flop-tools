@@ -102,3 +102,18 @@ test("payment evidence must also bind locked amount to the prepared requirement"
   assert.equal(receipt.payment.status,"UNVERIFIED");
   assert.equal(receipt.status,"FAILED");
 });
+
+
+test("local no-payment completion does not assert external validation",async()=>{
+  const stateDir=await mkdtemp(join(tmpdir(),"flop-local-completion-"));
+  const layer=new EconomicWorkLayer({stateDir,allowUnfunded:true});
+  const offer=normalizeMarketOffer({id:"local-1",proto:"a2a",task:"produce execution receipt",from:"did:payer"},"test",0);
+  const plan=rankPlans([offer],new Map(),{allowUnfunded:true})[0]!;
+  const prepared=await layer.executePlan(plan,{workId:"w1",executor:"agent",result:{ok:true}});
+  assert.equal(prepared.paymentRequirement,undefined);
+  const receipt=await layer.finalize(prepared);
+  assert.equal(receipt.status,"COMPLETED");
+  const records=await layer.memory.read();
+  assert.equal(records.at(-1)?.outcome,"COMPLETED");
+  assert.equal(records.some(x=>x.outcome==="VALIDATED"),false);
+});
