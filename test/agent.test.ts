@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { FlopAgent } from "../src/agent.js";
+import { FlopAgent, delegatedArtifactName } from "../src/agent.js";
 import { executeRoutedWork } from "../src/router-adapter.js";
 import type { AgentConfig } from "../src/types.js";
 
@@ -107,7 +107,8 @@ test("one FLOP Agent delegates real HTTP work and independently re-verifies the 
       stateDir:join(root,"client-state"),
       runtime:{kind:"shell",command:process.execPath,args:["-e","console.log('{}')"],timeoutMs:3000,maxAttempts:1},
     };
-    const bundle = await new FlopAgent(clientConfig).run({
+    const client = new FlopAgent(clientConfig);
+    const bundle = await client.run({
       id:"work-remote",capability:"research",input:{task:"ping"},idempotencyKey:"remote-once",
     });
     assert.equal(bundle.receipt.executor, "a-remote");
@@ -130,6 +131,16 @@ test("one FLOP Agent delegates real HTTP work and independently re-verifies the 
     await new Promise<void>(resolve => server.close(()=>resolve()));
     await rm(root,{recursive:true,force:true});
   }
+});
+
+
+
+test("delegated artifact filenames are path-independent hashes",()=>{
+  const name=delegatedArtifactName("../escaped-delegated-work");
+  assert.match(name,/^[0-9a-f]{64}\.json$/);
+  assert.equal(name.includes(".."),false);
+  assert.equal(name.includes("/"),false);
+  assert.equal(name.includes("\\"),false);
 });
 
 test("budgeted work fails closed until comparable pricing exists", async () => {
