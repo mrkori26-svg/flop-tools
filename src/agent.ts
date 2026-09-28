@@ -17,6 +17,8 @@ async function upsertAdvertisement(path: string, item: AgentAdvertisement): Prom
   await writeFile(path, JSON.stringify(next, null, 2) + "\n", "utf8");
 }
 
+export const delegatedArtifactName = (requestId: string): string => digest(requestId).slice(7) + ".json";
+
 export class FlopAgent {
   private static readonly incomingInflight = new Map<string,{requestDigest:string;promise:Promise<EvidenceBundle>}>();
   constructor(readonly config: AgentConfig) {}
@@ -73,7 +75,7 @@ export class FlopAgent {
     );
 
     if (routed.value.kind === "remote") {
-      await saveJson(join(this.config.stateDir, "delegated", `${request.id}.json`), { decision: routed.decision, bundle: routed.value.bundle });
+      await saveJson(join(this.config.stateDir, "delegated", delegatedArtifactName(request.id)), { requestId: request.id, decision: routed.decision, bundle: routed.value.bundle });
       await publishDelegatedObservation(this.config.stateDir, request, routed.decision, routed.value.bundle);
       return routed.value.bundle;
     }
