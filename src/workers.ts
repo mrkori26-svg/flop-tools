@@ -42,16 +42,7 @@ async function inference(prompt:string):Promise<{text:string;model:string;provid
       await new Promise(r=>setTimeout(r,[1000,2500,5000,8000][attempt]));
     }
   }
-  const model=process.env.OLLAMA_MODEL||"gemma4:12b";
-  const res=await fetch("http://127.0.0.1:11434/api/generate",{
-    method:"POST",headers:{"content-type":"application/json"},
-    body:JSON.stringify({model,prompt,stream:false,options:{temperature:0.1,num_predict:1200},keep_alive:"10m"}),
-    signal:AbortSignal.timeout(120000)
-  });
-  if(!res.ok) throw new Error(`OLLAMA_HTTP_${res.status}`);
-  const j:any=await res.json(); const text=safeText(j.response);
-  if(!text) throw new Error("EMPTY_INFERENCE");
-  return {text,model,provider:"ollama"};
+  throw new Error("CLOUD_INFERENCE_REQUIRED_OR_FAILED");
 }
 
 export async function executeWorker(worker:WorkerKind,input:any):Promise<WorkerExecution>{
