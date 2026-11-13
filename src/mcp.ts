@@ -1,3 +1,4 @@
+import { verifyRetainedReceipt } from "@flop-tools/work-execution-receipt";
 import { McpServer } from "@modelcontextprotocol/server";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import * as z from "zod/v4";
@@ -119,6 +120,19 @@ export function createMcpServer(config: AgentConfig): McpServer {
       };
     },
   );
+  server.registerTool("flop_receipt_recheck", {
+    title: "Recheck retained work receipt",
+    description: "Offline schema, exact artifact and optional pinned Ed25519 signature checks. Does not prove execution, payment or complete observation.",
+    inputSchema: z.object({
+      receipt: z.unknown(),
+      artifacts: z.array(z.object({digest:z.string().max(80),bytesBase64:z.string().max(2800000)})).max(64).optional(),
+      expected: z.object({workId:z.string().max(4096).optional(),participantId:z.string().max(4096).optional(),
+        publicKey:z.string().max(16384).optional(),signature:z.string().max(256).optional()}).optional(),
+    }),
+  }, async args => {
+    const report=verifyRetainedReceipt(args.receipt,args.artifacts??[],args.expected??{});
+    return {isError:report.result==="FAIL",content:[{type:"text",text:jsonText(report)}]};
+  });
   return server;
 }
 

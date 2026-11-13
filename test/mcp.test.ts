@@ -25,6 +25,7 @@ test("MCP surface exposes the canonical RUN tools", () => {
     "flop_agent_publish",
     "flop_agent_candidates",
     "flop_agent_doctor",
+    "flop_receipt_recheck",
   ]) {
     assert.ok(server.toolInputSchemaJson(name), `missing MCP tool ${name}`);
   }

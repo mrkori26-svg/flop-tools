@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { createReceipt, RECEIPT_VERSION } from "@flop-tools/work-execution-receipt";
-import { verifyExternalProfile } from "@flop-tools/conformance-lab";
+import { createReceipt, RECEIPT_VERSION, verifyRetainedReceipt } from "@flop-tools/work-execution-receipt";
+import { EXTERNAL_PROFILES, verifyExternalProfile } from "@flop-tools/conformance-lab";
 import { runNoValueSettlementEvidence, verifyTestnetSettlement, type TestnetRailObservation } from "@flop-tools/economic-runtime";
 import { observeEvmTestnetSettlement } from "./evm-observer.js";
 import type { WorkerKind } from "./capabilities.js";
@@ -55,7 +55,11 @@ export async function executeWorker(worker:WorkerKind,input:any):Promise<WorkerE
     }else if(worker==="conformance"){
       const profile=safeText(input?.profile)||"flop-agent";
       const result=verifyExternalProfile(profile,input?.artifact??input?.value??input);
-      output=result; metadata.profile=profile; evidenceRefs.push(`conformance:${digest(result)}`);
+      output=result; metadata.profile=profile; metadata.verdict=result.result; evidenceRefs.push(`conformance:${digest(result)}`);
+    }else if(worker==="execution-proof" && input?.operation==="verify-retained"){
+      const result=verifyRetainedReceipt(input.receipt,input.artifacts??[],input.expected??{});
+      output=result;metadata.verdict=result.result;metadata.operation="verify-retained";
+      evidenceRefs.push("recheck:"+digest(result));
     }else if(worker==="execution-proof"){
       const workId=safeText(input?.workId)||`work-${Date.now()}`;
       const result=input?.result??input?.output??input;
@@ -102,3 +106,5 @@ export async function executeWorker(worker:WorkerKind,input:any):Promise<WorkerE
     return {schema:"flop.worker-execution/v1",worker,status:"FAILED",startedAt,finishedAt:new Date().toISOString(),evidenceRefs:[],metadata:{},error:error instanceof Error?error.message:String(error)};
   }
 }
+
+export const supportedConformanceProfiles = () => [...EXTERNAL_PROFILES];

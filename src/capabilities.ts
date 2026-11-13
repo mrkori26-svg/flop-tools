@@ -11,7 +11,7 @@ export type WorkerCapability = {
 export const INTERNAL_WORKERS:WorkerCapability[]=[
   {worker:"inference",capabilities:["inference","useful-inference","llm"],assurance:"EVIDENCE",economic:true},
   {worker:"conformance",capabilities:["conformance","verification","protocol-reproduction","ci-evidence"],assurance:"VERIFIED",economic:true},
-  {worker:"execution-proof",capabilities:["proof-of-execution","execution-receipt","evidence-bundle"],assurance:"VERIFIED",economic:true},
+  {worker:"execution-proof",capabilities:["proof-of-execution","execution-receipt","evidence-bundle","receipt-verification"],assurance:"VERIFIED",economic:true},
   {worker:"settlement",capabilities:["settlement","testnet-settlement","rail-verification"],assurance:"VERIFIED",economic:true},
   {worker:"proposal-transport",capabilities:["proposal-transport","delivery-proof","readback"],assurance:"EVIDENCE",economic:true},
   {worker:"research-protocol",capabilities:["research","protocol-analysis","spec-analysis"],assurance:"EVIDENCE",economic:true},
