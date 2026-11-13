@@ -6,41 +6,50 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout flop-tools
+      - name: Checkout agent
         uses: actions/checkout@v4
         with:
           path: flop-tools
-      - name: Checkout economic runtime
+      - name: Checkout flop-work-execution-receipt
         uses: actions/checkout@v4
         with:
-          repository: retardio73-boop/flop-economic-runtime
-          path: flop-economic-runtime
-      - name: Checkout session router
-        uses: actions/checkout@v4
-        with:
-          repository: retardio73-boop/flop-session-router
-          path: flop-session-router
-      - name: Checkout conformance lab
-        uses: actions/checkout@v4
-        with:
-          repository: retardio73-boop/flop-conformance-lab
-          path: flop-conformance-lab
-      - name: Checkout execution receipt
-        uses: actions/checkout@v4
-        with:
-          repository: retardio73-boop/flop-work-execution-receipt
+          repository: mrkori26-svg/flop-work-execution-receipt
+          ref: 641baa49ed8d87a467236b8adee7b3c4a6f82750
           path: flop-work-execution-receipt
+      - name: Checkout flop-economic-runtime
+        uses: actions/checkout@v4
+        with:
+          repository: mrkori26-svg/flop-economic-runtime
+          ref: cc486722a1c88066f98cf679dfa16110281db1d0
+          path: flop-economic-runtime
+      - name: Checkout flop-session-router
+        uses: actions/checkout@v4
+        with:
+          repository: mrkori26-svg/flop-session-router
+          ref: 4fac72a02de78d6a16ca7008c9542f58eed5a2d6
+          path: flop-session-router
+      - name: Checkout flop-conformance-lab
+        uses: actions/checkout@v4
+        with:
+          repository: mrkori26-svg/flop-conformance-lab
+          ref: 4a28969a50c4e0a241c4704d0bc3a468e82e63df
+          path: flop-conformance-lab
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Install
+      - name: Build and verify pinned sibling dependencies
+        shell: bash
+        run: |
+          for repo in flop-work-execution-receipt flop-economic-runtime flop-session-router flop-conformance-lab; do
+            (cd "$repo" && npm ci --ignore-scripts && npm run check) || exit 1
+          done
+      - name: Install agent
         working-directory: flop-tools
         run: npm ci --ignore-scripts
-      - name: Verify
+      - name: Verify agent and offline gateway
         working-directory: flop-tools
         run: npm run check

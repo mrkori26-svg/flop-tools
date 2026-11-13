@@ -13,3 +13,5 @@ token and worker function. Bind it to loopback. startLocalGateway(stackRoot) is 
 stack entry point and retains the existing private token file. It does not publish a network service.
 conformance.verify profiles come from Conformance Lab, including router-evidence.
 Run npm run check to verify the worker, MCP discovery and local HTTP integration.
+
+CI uses the exact sibling revisions in INTEGRATION_REVISIONS.json, installs and builds them before the agent. Sibling directory names must match the package file dependencies.
