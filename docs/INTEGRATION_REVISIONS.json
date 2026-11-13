@@ -13,10 +13,10 @@
   },
   "flop-session-router": {
     "repository": "https://github.com/mrkori26-svg/flop-session-router",
-    "commit": "4fac72a02de78d6a16ca7008c9542f58eed5a2d6"
+    "commit": "51dfe08ee5d89940fed8d69736f6fe318eb2b0b0"
   },
   "flop-conformance-lab": {
     "repository": "https://github.com/mrkori26-svg/flop-conformance-lab",
-    "commit": "4a28969a50c4e0a241c4704d0bc3a468e82e63df"
+    "commit": "6ebcbb0924971c4ecff7b72a69d61e3f78365e17"
   }
 }

@@ -30,13 +30,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: mrkori26-svg/flop-session-router
-          ref: 4fac72a02de78d6a16ca7008c9542f58eed5a2d6
+          ref: 51dfe08ee5d89940fed8d69736f6fe318eb2b0b0
           path: flop-session-router
       - name: Checkout flop-conformance-lab
         uses: actions/checkout@v4
         with:
           repository: mrkori26-svg/flop-conformance-lab
-          ref: 4a28969a50c4e0a241c4704d0bc3a468e82e63df
+          ref: 6ebcbb0924971c4ecff7b72a69d61e3f78365e17
           path: flop-conformance-lab
       - uses: actions/setup-node@v4
         with:
