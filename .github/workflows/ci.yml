@@ -19,25 +19,35 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: mrkori26-svg/flop-economic-runtime
+          ref: cc486722a1c88066f98cf679dfa16110281db1d0
           path: flop-economic-runtime
       - name: Checkout session router
         uses: actions/checkout@v4
         with:
           repository: mrkori26-svg/flop-session-router
+          ref: 1692fb3b79c679de269c5c869f1cba3135bce87d
           path: flop-session-router
       - name: Checkout conformance lab
         uses: actions/checkout@v4
         with:
           repository: mrkori26-svg/flop-conformance-lab
+          ref: 6ebcbb0924971c4ecff7b72a69d61e3f78365e17
           path: flop-conformance-lab
       - name: Checkout execution receipt
         uses: actions/checkout@v4
         with:
           repository: mrkori26-svg/flop-work-execution-receipt
+          ref: 641baa49ed8d87a467236b8adee7b3c4a6f82750
           path: flop-work-execution-receipt
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Build and verify pinned sibling dependencies
+        shell: bash
+        run: |
+          for repo in flop-work-execution-receipt flop-economic-runtime flop-session-router flop-conformance-lab; do
+            (cd "$repo" && npm ci --ignore-scripts && npm run check) || exit 1
+          done
       - name: Install
         working-directory: flop-tools
         run: npm ci --ignore-scripts
