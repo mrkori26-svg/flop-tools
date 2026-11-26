@@ -1,0 +1,33 @@
+{
+  "schema": "flop.testnet-assurance/readiness-v1",
+  "asOf": 1795667515573,
+  "genesis": "0x918abd58fb16306b30ef3886514cfaebffecb4de43e82b6f8ec4795c43cfd800",
+  "evidence": {
+    "rpc": "f03cfe1cc83c31f3f30bee562b557af43c66d3a2818d8bff665848e9ea30a575",
+    "chain": "fd99852609101d1652e6d9f0e828ca7d63151a63ffc309aa6d6f7a7b061a5c2d",
+    "limits": "df926ce57075f6693e8b8f3e185524de287c0c6ddb1962854dfd1e6aa30860e0",
+    "health": "690f4ed9fa2d9ed164b327f361b8dcba640cb146fd55a7f3c05dd70e6f80b177",
+    "gateway": "5e4405779635fa512b9e08b1404dc6dd6be5862a196ed89bc4dbc599c7157388",
+    "sdk": "5594805033e46f57c4677fd313a96444fb4165296e43159b7cc17f90cb3d9ff9",
+    "sdkSupport": "e8388c5b3363db940bf27c18c3ed7d948717280ff5921f9eef9291b64921a62b",
+    "account": null
+  },
+  "findings": {
+    "chain": "OBSERVED",
+    "runtime": 1014038,
+    "sdk": "SUPPLIED_VERSION_RANGE_MATCH",
+    "faucet": "DAILY_CAP_REACHED",
+    "gateway": "WRONG_NETWORK",
+    "registration": "UNVERIFIED",
+    "settlement": "UNVERIFIED"
+  },
+  "assessment": "NOT_OPERATIONALLY_ATTESTED",
+  "executionAuthorized": false,
+  "economicAuthority": false,
+  "limitations": [
+    "Digest binds supplied bytes, not source authenticity.",
+    "Account and SDK claims require independent verification.",
+    "Health is not admission or settlement proof."
+  ],
+  "certificateSha256": "b7b5dc5427a18cfebba9106299669e60319e1104e64e5fccea46ad06612afe24"
+}
