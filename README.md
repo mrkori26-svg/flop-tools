@@ -30,6 +30,10 @@ install -> advertise -> discover -> route -> execute -> result
 
 The builder should not need to understand Receipt, EvidenceBundle or Conformance Lab to obtain Tier 1 value.
 
+## Testnet Assurance
+
+A standalone read-only suite for Testnet readiness, faucet policy, runtime metadata drift, voucher activation boundaries, and normalized settlement reconciliation. Run it without installing the agent workspace dependencies. See [Testnet Assurance](tools/testnet-assurance/README.md) and the [dated live smoke test](tools/testnet-assurance/LIVE_2026-11-26.md).
+
 ## Quick start
 
 > Distribution note: 0.1.0 is currently a source-workspace alpha. Router, Receipt and Lab are sibling packages and are not yet published to npm.

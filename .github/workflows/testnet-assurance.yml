@@ -1,0 +1,30 @@
+name: Testnet Assurance
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  assurance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Syntax and offline regression suite
+        run: |
+          node --check tools/testnet-assurance/cli.mjs
+          node --test tools/testnet-assurance/assurance.test.mjs
+      - name: Replay retained public observation
+        run: node tools/testnet-assurance/cli.mjs verify-certificate tools/testnet-assurance/evidence/2026-11-26T043155Z.certificate.json tools/testnet-assurance/evidence/2026-11-26T043155Z.capture.json.gz
+      - name: Synthetic CLI smoke test
+        run: |
+          node tools/testnet-assurance/examples.mjs > example.json
+          node tools/testnet-assurance/cli.mjs readiness example.json > certificate.json
+          node tools/testnet-assurance/cli.mjs verify-certificate certificate.json example.json
+          node tools/testnet-assurance/cli.mjs faucet example.json
+          node tools/testnet-assurance/cli.mjs voucher-ledger example.json
+          node tools/testnet-assurance/cli.mjs settlement example.json
